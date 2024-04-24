@@ -15,9 +15,9 @@ message("Qt5: \t\t${Qt5_VERSION},\t${Qt5_DIR}")
 string(REGEX MATCH "^[0-9]+" CGAL_Major "${CGAL_VERSION}")  # extract major version of CGAL
 
 # Globbing files
-file(GLOB header_impl "include/*.hpp")
+file(GLOB header_impl "include/*.hpp" "include/*.h")
 file(GLOB lib_src "src/*.cpp")
-file(GLOB test_headers "test/*.hpp")
+file(GLOB test_headers "test/*.hpp" "test/*.h")
 file(GLOB test_src "test/*.cpp")
 
 # Control building args

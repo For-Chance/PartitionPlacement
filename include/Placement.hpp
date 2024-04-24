@@ -1,23 +1,26 @@
-#include <iostream>
+#ifndef PLACEMENT_HPP
+#define PLACEMENT_HPP
+#include "stdafx.h"
 
 namespace Placement
 {
+    struct PlacementProps
+    {
+        PlacementProps() {
+
+        }
+    };
     class Solver
     {
     private:
         /* data */
     public:
-        Solver();
-        ~Solver();
+        Solver(const PlacementProps& props = PlacementProps());
     };
 
-    Solver::Solver()
-    {
-        std::cout << "Hello Placement" << std::endl;
-    }
-
-    Solver::~Solver()
+    Solver::Solver(const PlacementProps& props)
     {
     }
 
 } // namespace Placement
+#endif // PLACEMENT_HPP

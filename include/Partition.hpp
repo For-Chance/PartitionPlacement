@@ -1,23 +1,26 @@
-#include <iostream>
+#ifndef PARTITION_HPP
+#define PARTITION_HPP
+#include "stdafx.h"
 
 namespace Partition
 {
+    struct PartitionProps {
+
+        PartitionProps() {
+               
+        }
+    };
+
     class Solver
     {
     private:
         /* data */
     public:
-        Solver();
-        ~Solver();
+        Solver(const PartitionProps& props);
     };
 
-    Solver::Solver()
-    {
-        std::cout << "Hello Partition" << std::endl;
-    }
-
-    Solver::~Solver()
+    Solver::Solver(const PartitionProps& props = PartitionProps())
     {
     }
-
 } // namespace Partition
+#endif // PARTITION_HPP

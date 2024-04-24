@@ -1,0 +1,11 @@
+{
+    "PartitionProps": {
+    },
+    "PlacementProps": {
+        
+    },
+    "ControlProps": {
+        "InputFile": "../data/sample1.Info.geojson",
+        "OutputFile": ""
+    }
+}
