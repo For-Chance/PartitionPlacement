@@ -5,7 +5,7 @@
         
     },
     "ControlProps": {
-        "InputFile": "../data/sample1.Info.geojson",
+        "InputFile": "../data/sample10.Info.geojson",
         "OutputFile": ""
     }
 }

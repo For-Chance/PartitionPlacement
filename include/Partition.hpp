@@ -2,8 +2,18 @@
 #define PARTITION_HPP
 #include "stdafx.h"
 
+#include <CGAL/Exact_predicates_exact_constructions_kernel.h> 
+#include <CGAL/Polygon_with_holes_2.h>
+#include <CGAL/Polygon_2.h>
+#include <CGAL/Point_2.h>
+
 namespace Partition
 {
+    using K = CGAL::Exact_predicates_exact_constructions_kernel;
+    using Polygon_with_holes_2 = CGAL::Polygon_with_holes_2<K>;
+    using Polygon_2 = CGAL::Polygon_2<K>;
+    using Point_2 = CGAL::Point_2<K>;
+
     struct PartitionProps {
 
         PartitionProps() {
@@ -16,10 +26,11 @@ namespace Partition
     private:
         /* data */
     public:
-        Solver(const PartitionProps& props);
+        Solver(){}
+        Solver(const Polygon_with_holes_2& space, const PartitionProps& props = PartitionProps());
     };
 
-    Solver::Solver(const PartitionProps& props = PartitionProps())
+    Solver::Solver(const Polygon_with_holes_2& space, const PartitionProps& props)
     {
     }
 } // namespace Partition

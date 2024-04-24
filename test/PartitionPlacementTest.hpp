@@ -24,6 +24,8 @@ namespace ParitionPlacement {
         void showResult(const Solver& ppSolver);
 
         std::string geojson;
+        Context context;
+        ControlProps controlProps;
     };
 
     /// <summary>
@@ -36,8 +38,6 @@ namespace ParitionPlacement {
     /// <param name="config_file"></param>
     PartitionPlacementTest::PartitionPlacementTest(const std::string& config_file) {
         std::cout << "PartitionPlacementTest(const std::string& config_file)" << std::endl;
-        Context context;
-        ControlProps controlProps;
         parseConfigFile(config_file, context, controlProps);
         geojson = parseInputFile(controlProps.InputFile);
         Solver ppSolver(geojson, context);
@@ -74,5 +74,30 @@ namespace ParitionPlacement {
     /// <param name="ppSolver"></param>
     void PartitionPlacementTest::showResult(const Solver& ppSolver) {
         std::cout << "Show Result:" << std::endl;
+        const Polygon_with_holes_2& space = ppSolver.origin_space;
+        std::vector<Polygon_2> PolyParts_outer, PolyParts_holes;
+        PolyParts_outer.push_back(space.outer_boundary());
+        PolyParts_holes.insert(PolyParts_holes.end(), space.holes_begin(), space.holes_end());
+
+        // # Qt gui show
+        int argc = 1;
+        const char* argv[2] = { "viewer","\0" };
+        QApplication app(argc, const_cast<char**>(argv));
+        int screenWidth = 1920;
+        int screenHeight = 1080;
+        int centerX2 = screenWidth * 2 / 4;
+
+        CGAL::Color Point_Color(0, 0, 0);
+        CGAL::Color Room_Color(67, 177, 235);
+        CGAL::Color Holes_Color(255, 255, 255);
+        CGAL::Color Segment_Color(50, 50, 50);
+
+        std::string title = "output-" + controlProps.InputFile;
+        CGAL::CenterLineViewer<Polygon_2> mainwindow(app.activeWindow(), *PolyParts_outer.begin(), title.c_str());
+        mainwindow.move(centerX2 - mainwindow.width() / 2, screenHeight / 2 - mainwindow.height() / 2);
+        mainwindow.drawPartitions(PolyParts_holes, Segment_Color, Holes_Color, Point_Color);
+        mainwindow.drawPartitions(PolyParts_outer, Segment_Color, Room_Color, Point_Color);
+        mainwindow.show();
+        app.exec();
     }
 }
