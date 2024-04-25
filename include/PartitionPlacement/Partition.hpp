@@ -20,7 +20,7 @@ namespace Partition
     struct PartitionProps {
 
         PartitionProps() {
-               
+
         }
     };
 
@@ -29,10 +29,13 @@ namespace Partition
     private:
         /* data */
     public:
-        Solver(){}
+        Solver() {}
         Solver(const Polygon_with_holes_2& space, const PartitionProps& props = PartitionProps());
     };
+}
 
+namespace Partition
+{
     Solver::Solver(const Polygon_with_holes_2& space, const PartitionProps& props)
     {
         

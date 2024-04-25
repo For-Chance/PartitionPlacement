@@ -4,10 +4,8 @@
 #include "GeoJSON.hpp"
 #include "Viewer.hpp"
 
-#include <iostream>
-#include <string>
-
-namespace ParitionPlacement {
+namespace ParitionPlacement 
+{
     struct PartitionPlacementTest
     {
         using PartitionProps = Partition::PartitionProps;
@@ -27,7 +25,10 @@ namespace ParitionPlacement {
         Context context;
         ControlProps controlProps;
     };
+}
 
+namespace ParitionPlacement 
+{
     /// <summary>
     /// Constructor: 
     ///     1. parse config file; 

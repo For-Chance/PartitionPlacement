@@ -17,7 +17,10 @@ namespace Placement
     public:
         Solver(const PlacementProps& props = PlacementProps());
     };
+}
 
+namespace Placement 
+{
     Solver::Solver(const PlacementProps& props)
     {
     }

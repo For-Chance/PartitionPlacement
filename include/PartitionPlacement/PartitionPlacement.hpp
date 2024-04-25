@@ -6,9 +6,6 @@
 #include "GeoJSON.hpp"
 #include "stdafx.h"
 
-#include <iostream>
-#include <string>
-
 #include <CGAL/Exact_predicates_exact_constructions_kernel.h> 
 #include <CGAL/Polygon_with_holes_2.h>
 #include <CGAL/Polygon_2.h>
@@ -38,7 +35,10 @@ namespace ParitionPlacement
         static Polygon_2 convert_poly(std::vector<GeoJSON::Point>& points);
         static Polygon_with_holes_2 geojson_to_Pwh(std::string geojson);
     };
+}
 
+namespace ParitionPlacement
+{
     /// <summary>
     /// Constructor
     /// </summary>
