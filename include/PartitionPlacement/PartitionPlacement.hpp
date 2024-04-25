@@ -1,3 +1,5 @@
+#ifndef PARTITIONPLACEMENT_HPP
+#define PARTITIONPLACEMENT_HPP
 #include "Partition.hpp"
 #include "Placement.hpp"
 #include "PartitionPlacementContext.hpp"
@@ -79,3 +81,4 @@ namespace ParitionPlacement
         else return Polygon_with_holes_2(poly, holes.begin(), holes.end());
     }
 } // namespace PartitionPlacement
+#endif // PARTITIONPLACEMENT_HPP

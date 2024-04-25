@@ -1,4 +1,5 @@
-#pragma once
+#ifndef PARTITIONPLACEMENTCONTEXT_HPP
+#define PARTITIONPLACEMENTCONTEXT_HPP
 #include "Partition.hpp"
 #include "Placement.hpp"
 #include <string>
@@ -13,3 +14,4 @@ namespace ParitionPlacement {
         Context(const PartitionProps& partProps, const PlacementProps& placeProps) :partProps(partProps), placeProps(placeProps) {}
     };
 }
+#endif // !PARTITIONPLACEMENTCONTEXT_HPP

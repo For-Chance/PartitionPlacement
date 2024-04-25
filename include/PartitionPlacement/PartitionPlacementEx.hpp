@@ -1,4 +1,5 @@
-#pragma once
+#ifndef PARTITIONPLACEMENTEX_HPP
+#define PARTITIONPLACEMENTEX_HPP
 #include <string>
 #include "PartitionPlacement.hpp"
 
@@ -7,3 +8,4 @@ namespace PartitionPlacementEx {
         return "";
     }
 }
+#endif // PARTITIONPLACEMENTEX_HPP
