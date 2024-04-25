@@ -1,10 +1,10 @@
-﻿#ifndef PPGEOJSON_HPP
-#define PPGEOJSON_HPP
+﻿#ifndef GEOJSON_HPP
+#define GEOJSON_HPP
 #include "stdafx.h"
 #include "json/json.h"
 #include <fstream>
 
-namespace ParitionPlacement
+namespace GeoJSON
 {
     struct Point {
         double x, y;
@@ -49,7 +49,7 @@ namespace ParitionPlacement
     std::string out2str(const Block& block);
 }
 
-namespace ParitionPlacement
+namespace GeoJSON
 {
     void parse_geojson(const std::string& datastr, parseout& out)
     {
@@ -287,4 +287,4 @@ namespace ParitionPlacement
     }
 }
 
-#endif // PPGEOJSON_HPP
+#endif // GEOJSON_HPP

@@ -6,6 +6,8 @@
 #include <CGAL/Polygon_with_holes_2.h>
 #include <CGAL/Polygon_2.h>
 #include <CGAL/Point_2.h>
+#include <CGAL/partition_2.h>
+#include <list>
 
 namespace Partition
 {
@@ -13,6 +15,7 @@ namespace Partition
     using Polygon_with_holes_2 = CGAL::Polygon_with_holes_2<K>;
     using Polygon_2 = CGAL::Polygon_2<K>;
     using Point_2 = CGAL::Point_2<K>;
+    using Polygon_list = std::list<Polygon_2>;
 
     struct PartitionProps {
 
@@ -32,6 +35,8 @@ namespace Partition
 
     Solver::Solver(const Polygon_with_holes_2& space, const PartitionProps& props)
     {
+        
+       
     }
 } // namespace Partition
 #endif // PARTITION_HPP

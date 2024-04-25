@@ -1,8 +1,8 @@
 #include "Partition.hpp"
 #include "Placement.hpp"
 #include "PartitionPlacement.hpp"
-#include "PPGeoJSON.hpp"
-#include "PartitionPlaceViewer.hpp"
+#include "GeoJSON.hpp"
+#include "Viewer.hpp"
 
 #include <iostream>
 #include <string>
@@ -63,7 +63,7 @@ namespace ParitionPlacement {
     /// <param name="context"></param>
     /// <param name="controlProps"></param>
     void PartitionPlacementTest::parseConfigFile(const std::string& config_file, Context& context, ControlProps& controlProps) {
-        Json::Value p = parse_propsjson(config_file);
+        Json::Value p = GeoJSON::parse_propsjson(config_file);
         controlProps.InputFile = p["ControlProps"]["InputFile"].asString();
         controlProps.OutputFile = p["ControlProps"]["OutputFile"].asString();
     }

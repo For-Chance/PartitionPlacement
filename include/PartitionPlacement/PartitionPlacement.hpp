@@ -1,7 +1,7 @@
 #include "Partition.hpp"
 #include "Placement.hpp"
 #include "PartitionPlacementContext.hpp"
-#include "PPGeoJSON.hpp"
+#include "GeoJSON.hpp"
 #include "stdafx.h"
 
 #include <iostream>
@@ -29,11 +29,11 @@ namespace ParitionPlacement
     private:
         Partition::Solver PartitionSolver;
         Placement::Solver PlacementSolver;
-        
+
     public:
         Solver(const std::string& geojson = "", const Context& context = Context());
 
-        static Polygon_2 convert_poly(std::vector<Point>& points);
+        static Polygon_2 convert_poly(std::vector<GeoJSON::Point>& points);
         static Polygon_with_holes_2 geojson_to_Pwh(std::string geojson);
     };
 
@@ -50,7 +50,7 @@ namespace ParitionPlacement
         PlacementSolver = Placement::Solver(context.placeProps);
     }
 
-    Polygon_2 Solver::convert_poly(std::vector<Point>& points) {
+    Polygon_2 Solver::convert_poly(std::vector<GeoJSON::Point>& points) {
         std::vector<Point_2> pts;
         Point_2 tmp;
         for (auto& p : points) {
@@ -64,8 +64,8 @@ namespace ParitionPlacement
     }
 
     Polygon_with_holes_2 Solver::geojson_to_Pwh(std::string geojson) {
-        parseout res;
-        parse_geojson(geojson, res);
+        GeoJSON::parseout res;
+        GeoJSON::parse_geojson(geojson, res);
         auto& data = res.data[0];
         Polygon_2 poly = convert_poly(data.coords[0]);  // the first group geojson data, which is the outer boundary
         if (poly.is_clockwise_oriented()) poly.reverse_orientation();
