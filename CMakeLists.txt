@@ -23,7 +23,8 @@ add_compile_options("$<$<C_COMPILER_ID:MSVC>:/source-charset:utf-8>")
 
 # 定义一个函数来添加一个库和其依赖
 function(add_library_with_test PROJECT_NAME DEPENDENCY_LIBS)
-    set(PROJECT_TEST_NAME PartitionPlacementTest)
+    set(TEST_SUFFIX "Test")
+    set(PROJECT_TEST_NAME ${PROJECT_NAME}${TEST_SUFFIX})
 
     file(GLOB header_impl "include/${PROJECT_NAME}/*.hpp" "include/${PROJECT_NAME}/*.h")
     file(GLOB lib_src "src/${PROJECT_NAME}.cpp")
@@ -44,5 +45,6 @@ function(add_library_with_test PROJECT_NAME DEPENDENCY_LIBS)
     endif()
 endfunction()
 
-# PartitionPlacement
-add_library_with_test("PartitionPlacement" "")
+add_library_with_test("SimplifyBoundary" "")
+add_library_with_test("CenterLine" "SimplifyBoundary")
+add_library_with_test("PartitionPlacement" "SimplifyBoundary;CenterLine")

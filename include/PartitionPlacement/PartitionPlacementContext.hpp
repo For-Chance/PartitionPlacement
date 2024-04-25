@@ -3,15 +3,24 @@
 #include "Partition.hpp"
 #include "Placement.hpp"
 #include <string>
-namespace ParitionPlacement {
-    struct Context {
-        using PartitionProps = Partition::PartitionProps;
-        using PlacementProps = Placement::PlacementProps;
 
+namespace ParitionPlacement {
+    using PartitionProps = Partition::PartitionProps;
+    using PlacementProps = Placement::PlacementProps;
+
+    struct PartitionPlacementProps {
         PartitionProps partProps;
         PlacementProps placeProps;
-        Context() :partProps(PartitionProps()), placeProps(PlacementProps()) {}
-        Context(const PartitionProps& partProps, const PlacementProps& placeProps) :partProps(partProps), placeProps(placeProps) {}
+
+        PartitionPlacementProps() :partProps(PartitionProps()), placeProps(PlacementProps()) {}
+        PartitionPlacementProps(const PartitionProps& partProps, const PlacementProps& placeProps) :partProps(partProps), placeProps(placeProps) {}
+    };
+
+    struct Context {
+        PartitionPlacementProps ppProps;
+
+        Context() :ppProps(PartitionPlacementProps()) {}
+        Context(const PartitionPlacementProps& ppProps) :ppProps(ppProps) {}
     };
 }
 #endif // !PARTITIONPLACEMENTCONTEXT_HPP

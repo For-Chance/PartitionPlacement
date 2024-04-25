@@ -13,9 +13,6 @@
 
 namespace ParitionPlacement
 {
-    using PartitionProps = Partition::PartitionProps;
-    using PlacementProps = Placement::PlacementProps;
-
     using K = CGAL::Exact_predicates_exact_constructions_kernel;
     using Polygon_with_holes_2 = CGAL::Polygon_with_holes_2<K>;
     using Polygon_2 = CGAL::Polygon_2<K>;
@@ -48,8 +45,8 @@ namespace ParitionPlacement
     Solver::Solver(const std::string& geojson, const Context& context) {
         std::cout << "Hello PartitionPlacement" << std::endl;
         origin_space = geojson_to_Pwh(geojson);
-        PartitionSolver = Partition::Solver(origin_space, context.partProps);
-        PlacementSolver = Placement::Solver(context.placeProps);
+        PartitionSolver = Partition::Solver(origin_space, context.ppProps.partProps);
+        PlacementSolver = Placement::Solver(context.ppProps.placeProps);
     }
 
     Polygon_2 Solver::convert_poly(std::vector<GeoJSON::Point>& points) {
