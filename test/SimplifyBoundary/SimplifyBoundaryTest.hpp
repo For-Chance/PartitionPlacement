@@ -15,8 +15,6 @@ namespace SimplifyBoundary {
         using Point_2 = CGAL::Point_2<K>;
         using Vector_2 = CGAL::Vector_2<K>;
 
-        SimplifyBoundaryTest(const std::string& config_file);
-
         /*
         * @brief Parameters of controlling display.
         */
@@ -26,6 +24,8 @@ namespace SimplifyBoundary {
             std::string InputFile;
             std::string OutputFile;
         };
+
+        SimplifyBoundaryTest(const std::string& config_file);
 
         void parseConfigFile(const std::string& config_file, Context& context, ControlProps& controlProps);
         std::string parseInputFile(const std::string& input_file);
