@@ -11,21 +11,23 @@
 
 namespace Partition
 {
-    using K = CGAL::Exact_predicates_exact_constructions_kernel;
-    using Polygon_with_holes_2 = CGAL::Polygon_with_holes_2<K>;
-    using Polygon_2 = CGAL::Polygon_2<K>;
-    using Point_2 = CGAL::Point_2<K>;
-    using Polygon_list = std::list<Polygon_2>;
-
+    template <typename K>
     struct PartitionProps {
-
         PartitionProps() {
 
         }
     };
 
+    template <typename K>
     class Solver
     {
+        using FT = typename K::FT;
+        using Polygon_with_holes_2 = CGAL::Polygon_with_holes_2<K>;
+        using Polygon_2 = CGAL::Polygon_2<K>;
+        using Point_2 = CGAL::Point_2<K>;
+        using Polygon_list = std::list<Polygon_2>;
+
+        using PartitionProps = PartitionProps<K>;
     private:
         /* data */
     public:
@@ -36,7 +38,8 @@ namespace Partition
 
 namespace Partition
 {
-    Solver::Solver(const Polygon_with_holes_2& space, const PartitionProps& props)
+    template <typename K>
+    Solver<K>::Solver(const Polygon_with_holes_2& space, const PartitionProps& props)
     {
         
        

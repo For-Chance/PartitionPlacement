@@ -1,15 +1,23 @@
 #include "Partition.hpp"
 #include "Placement.hpp"
-#include "PartitionPlacement.hpp"
+#include "PartitionPlacementContext.hpp"
 #include "GeoJSON.hpp"
 #include "Viewer.hpp"
+
+#include <CGAL/Exact_predicates_exact_constructions_kernel.h>
+#include <CGAL/Polygon_2.h>
+#include <CGAL/Polygon_with_holes_2.h>
 
 namespace ParitionPlacement 
 {
     struct PartitionPlacementTest
     {
-        using PartitionProps = Partition::PartitionProps;
-        using PlacementProps = Placement::PlacementProps;
+        using K = CGAL::Exact_predicates_exact_constructions_kernel;
+        using PartitionProps = Partition::PartitionProps<K>;
+        using PlacementProps = Placement::PlacementProps<K>;
+
+        using Polygon_2 = CGAL::Polygon_2<K>;
+        using Polygon_with_holes_2 = CGAL::Polygon_with_holes_2<K>;
 
         struct ControlProps {
             std::string InputFile;
@@ -17,12 +25,12 @@ namespace ParitionPlacement
         };
 
         PartitionPlacementTest(const std::string& config_file);
-        void parseConfigFile(const std::string& config_file, Context& context, ControlProps& controlProps);
+        void parseConfigFile(const std::string& config_file, Context<K>& context, ControlProps& controlProps);
         std::string parseInputFile(const std::string& input_file);
-        void showResult(const Solver& ppSolver);
+        void showResult(const Solver<K>& ppSolver);
 
         std::string geojson;
-        Context context;
+        Context<K> context;
         ControlProps controlProps;
     };
 }
@@ -41,7 +49,7 @@ namespace ParitionPlacement
         std::cout << "PartitionPlacementTest(const std::string& config_file)" << std::endl;
         parseConfigFile(config_file, context, controlProps);
         geojson = parseInputFile(controlProps.InputFile);
-        Solver ppSolver(geojson, context);
+        Solver<K> ppSolver(geojson, context.ppProps.partProps, context.ppProps.placeProps);
         showResult(ppSolver);
     }
 
@@ -63,7 +71,7 @@ namespace ParitionPlacement
     /// <param name="config_file"></param>
     /// <param name="context"></param>
     /// <param name="controlProps"></param>
-    void PartitionPlacementTest::parseConfigFile(const std::string& config_file, Context& context, ControlProps& controlProps) {
+    void PartitionPlacementTest::parseConfigFile(const std::string& config_file, Context<K>& context, ControlProps& controlProps) {
         Json::Value p = GeoJSON::parse_propsjson(config_file);
         controlProps.InputFile = p["ControlProps"]["InputFile"].asString();
         controlProps.OutputFile = p["ControlProps"]["OutputFile"].asString();
@@ -73,7 +81,7 @@ namespace ParitionPlacement
     /// Show result with QT
     /// </summary>
     /// <param name="ppSolver"></param>
-    void PartitionPlacementTest::showResult(const Solver& ppSolver) {
+    void PartitionPlacementTest::showResult(const Solver<K>& ppSolver) {
         std::cout << "Show Result:" << std::endl;
         const Polygon_with_holes_2& space = ppSolver.origin_space;
         std::vector<Polygon_2> PolyParts_outer, PolyParts_holes;

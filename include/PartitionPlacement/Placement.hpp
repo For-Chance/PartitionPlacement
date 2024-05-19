@@ -4,14 +4,20 @@
 
 namespace Placement
 {
+    template <typename K>
     struct PlacementProps
     {
         PlacementProps() {
 
         }
     };
+    
+    template <typename K>
     class Solver
     {
+        using FT = typename K::FT;
+
+        using PlacementProps = PlacementProps<K>;
     private:
         /* data */
     public:
@@ -21,7 +27,8 @@ namespace Placement
 
 namespace Placement 
 {
-    Solver::Solver(const PlacementProps& props)
+    template <typename K>
+    Solver<K>::Solver(const PlacementProps& props)
     {
     }
 
