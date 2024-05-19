@@ -1,4 +1,6 @@
 #pragma once
+#define _USE_MATH_DEFINES
+#include <cmath>
 #include <set>
 #include <map>
 #include <list>
@@ -7,3 +9,4 @@
 #include <memory>
 #include <iostream>
 #include <algorithm>
+#include <functional>

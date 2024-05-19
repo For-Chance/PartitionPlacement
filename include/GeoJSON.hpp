@@ -4,6 +4,9 @@
 #include "json/json.h"
 #include <fstream>
 
+#include <CGAL/Polygon_2.h>
+#include <CGAL/Polygon_with_holes_2.h>
+#include <CGAL/Vector_2.h>
 namespace GeoJSON
 {
     struct Point {
@@ -47,6 +50,63 @@ namespace GeoJSON
     std::string out2str(const std::vector<Block>& ucs_blocks, const std::vector<Point>& corr_ucs);
     std::string out2str(const std::vector<Block>& rect_blocks, const std::vector<Block>& centerline_blocks);
     std::string out2str(const Block& block);
+
+    template <typename K, typename Polygon_2 = CGAL::Polygon_2<K>, typename Point_2 = CGAL::Point_2<K>>
+    Polygon_2 convert_poly(const std::vector<GeoJSON::Point>& points) {
+        std::vector<Point_2> pts;
+        Point_2 tmp;
+        for (auto& p : points) {
+            Point_2 pt(p.x, p.y);
+            if (!pts.empty() && tmp == pt) continue;
+            pts.push_back(pt);
+            tmp = pt;
+        }
+        if (pts.front() == pts.back()) pts.pop_back();
+        return Polygon_2(pts.begin(), pts.end());
+    }
+    template <typename K, typename Polygon_with_holes_2 = CGAL::Polygon_with_holes_2<K>, typename Polygon_2 = CGAL::Polygon_2<K>>
+    Polygon_with_holes_2 geojson_to_Pwh(const std::string& geojson) {
+        parseout res;
+        parse_geojson(geojson, res);
+        auto& data = res.data[0];
+        Polygon_2 poly = convert_poly<K>(data.coords[0]);  // the first group geojson data, which is the outer boundary
+        if (poly.is_clockwise_oriented()) poly.reverse_orientation();
+        std::vector<Polygon_2> holes;
+        for (int i = 1; i < data.coords.size(); ++i) {
+            Polygon_2 hole = convert_poly<K>(data.coords[i]);
+            if (hole.is_counterclockwise_oriented()) hole.reverse_orientation();
+            holes.push_back(hole);
+        }
+        if (holes.empty()) return Polygon_with_holes_2(poly);
+        else return Polygon_with_holes_2(poly, holes.begin(), holes.end());
+    }
+    template <typename K, typename Polygon_2 = CGAL::Polygon_2<K>, typename Vector_2 = CGAL::Vector_2<K>>
+    std::vector<Point> convert_points(const Polygon_2& poly, const Vector_2& offset) {
+        std::vector<Point> ans;
+        auto it = poly.vertices_begin();
+        if (it == poly.vertices_end()) {
+            throw("poly is empty");
+        }
+        for (; it != poly.vertices_end(); ++it)
+            ans.emplace_back(CGAL::to_double(it->x() + offset.x()), CGAL::to_double(it->y() + offset.y()));
+        ans.emplace_back(CGAL::to_double(poly.vertices_begin()->x() + offset.x()), CGAL::to_double(poly.vertices_begin()->y() + offset.y()));
+        return ans;
+    }
+    template <typename K, typename Polygon_with_holes_2 = CGAL::Polygon_with_holes_2<K>, typename Vector_2 = CGAL::Vector_2<K>>
+    std::string Pwh_to_geojson(const Polygon_with_holes_2& polygon, Vector_2 offset = Vector_2(0, 0)) {
+        Block block;
+        block.coords.push_back(convert_points<K>(polygon.outer_boundary(), offset));
+        for (auto h_it = polygon.holes_begin(); h_it != polygon.holes_end(); ++h_it) {
+            block.coords.push_back(convert_points<K>(*h_it, offset));
+        }
+        return out2str(block);
+    }
+    template <typename K, typename Polygon_2 = CGAL::Polygon_2<K>, typename Vector_2 = CGAL::Vector_2<K>>
+    std::string Poly_to_geojson(const CGAL::Polygon_2<K>& polygon, CGAL::Vector_2<K> offset = CGAL::Vector_2<K>(0, 0)) {
+        Block block;
+        block.coords.push_back(convert_points<K>(polygon, offset));
+        return out2str(block);
+    }
 }
 
 namespace GeoJSON

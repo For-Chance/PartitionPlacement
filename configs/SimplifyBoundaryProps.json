@@ -1,0 +1,31 @@
+{
+    "Sprops": {
+        "search_convex_area_thre": 0.1,
+        "search_concave_area_thre": 0.002,
+        "search_thre": 0.2,
+        "del_area_thre": 0.025,
+        "del_mdis_thre": 0.05,
+        "del_bbs_width_thre": 0.1,
+        "not_del_pbrate": 0.1,
+        "theta_thre1": 176,
+        "theta_thre2": 160,
+        "min_circle_points_num": 4,
+        "k1": 40,
+        "k2": 0.2,
+        "thre_max_multipe": 4,
+        "thre_gap_node_num": 5,
+        "isRemerge": true,
+        "isProcess": false
+    },
+    "Eprops": {
+        "simplify_order": "0",
+        "offset": 1000,
+        "tri_simplify_cost": 0.7
+    },
+    "Cprops": {
+        "showId": true,
+        "showMode": 2,
+        "InputFile": "../data/sample10.Info.geojson",
+        "OutputFile": ""
+    }
+}

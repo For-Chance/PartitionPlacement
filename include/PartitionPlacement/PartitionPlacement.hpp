@@ -28,9 +28,6 @@ namespace ParitionPlacement
 
     public:
         Solver(const std::string& geojson = "", const Context& context = Context());
-
-        static Polygon_2 convert_poly(std::vector<GeoJSON::Point>& points);
-        static Polygon_with_holes_2 geojson_to_Pwh(std::string geojson);
     };
 }
 
@@ -44,38 +41,9 @@ namespace ParitionPlacement
     /// <returns></returns>
     Solver::Solver(const std::string& geojson, const Context& context) {
         std::cout << "Hello PartitionPlacement" << std::endl;
-        origin_space = geojson_to_Pwh(geojson);
+        origin_space = GeoJSON::geojson_to_Pwh<K>(geojson);
         PartitionSolver = Partition::Solver(origin_space, context.ppProps.partProps);
         PlacementSolver = Placement::Solver(context.ppProps.placeProps);
-    }
-
-    Polygon_2 Solver::convert_poly(std::vector<GeoJSON::Point>& points) {
-        std::vector<Point_2> pts;
-        Point_2 tmp;
-        for (auto& p : points) {
-            Point_2 pt(p.x, p.y);
-            if (!pts.empty() && tmp == pt) continue;
-            pts.push_back(pt);
-            tmp = pt;
-        }
-        if (pts.front() == pts.back()) pts.pop_back();
-        return Polygon_2(pts.begin(), pts.end());
-    }
-
-    Polygon_with_holes_2 Solver::geojson_to_Pwh(std::string geojson) {
-        GeoJSON::parseout res;
-        GeoJSON::parse_geojson(geojson, res);
-        auto& data = res.data[0];
-        Polygon_2 poly = convert_poly(data.coords[0]);  // the first group geojson data, which is the outer boundary
-        if (poly.is_clockwise_oriented()) poly.reverse_orientation();
-        std::vector<Polygon_2> holes;
-        for (int i = 1; i < data.coords.size(); ++i) {
-            Polygon_2 hole = convert_poly(data.coords[i]);
-            if (hole.is_counterclockwise_oriented()) hole.reverse_orientation();
-            holes.push_back(hole);
-        }
-        if (holes.empty()) return Polygon_with_holes_2(poly);
-        else return Polygon_with_holes_2(poly, holes.begin(), holes.end());
     }
 } // namespace PartitionPlacement
 #endif // PARTITIONPLACEMENT_HPP

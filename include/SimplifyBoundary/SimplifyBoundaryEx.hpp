@@ -1,10 +1,13 @@
 #ifndef SIMPLIFYBOUNDARYEX_HPP
 #define SIMPLIFYBOUNDARYEX_HPP
-#include "SimplifyBoundary.hpp"
+#include "SimplifyBoundaryContext.hpp"
 #include <string>
 
+#include <CGAL/Exact_predicates_exact_constructions_kernel.h>
+
 namespace SimplifyBoundaryEx {
-    inline std::string Simplify(const std::string& geojson, const SimplifyBoundary::Context& context) {
+    using K = CGAL::Exact_predicates_exact_constructions_kernel;
+    inline std::string Simplify(const std::string& geojson, const SimplifyBoundary::Context<K>& context) {
         return "";
     }
 }
