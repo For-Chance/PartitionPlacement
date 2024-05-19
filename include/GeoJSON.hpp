@@ -51,6 +51,18 @@ namespace GeoJSON
     std::string out2str(const std::vector<Block>& rect_blocks, const std::vector<Block>& centerline_blocks);
     std::string out2str(const Block& block);
 
+	template <typename K, typename Segment_2 = CGAL::Segment_2<K>, typename Point_2 = CGAL::Point_2<K>>
+    std::string segments_to_geojson(const std::vector<Segment_2>& segs) {
+        std::vector<std::pair<Point, Point>> res;
+        for (auto& seg : segs) {
+            Point_2 src = seg.source(), dest = seg.target();
+            Point p0(CGAL::to_double(src.x()), CGAL::to_double(src.y()));
+            Point p1(CGAL::to_double(dest.x()), CGAL::to_double(dest.y()));
+            res.push_back(std::make_pair(p0, p1));
+        }
+        return out2str(res);
+    }
+
     template <typename K, typename Polygon_2 = CGAL::Polygon_2<K>, typename Point_2 = CGAL::Point_2<K>>
     Polygon_2 convert_poly(const std::vector<GeoJSON::Point>& points) {
         std::vector<Point_2> pts;
