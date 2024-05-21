@@ -1,22 +1,24 @@
 #include <string>
 #include <CGAL/Qt/Basic_viewer_qt.h>
 #ifdef CGAL_USE_BASIC_VIEWER
-#include <CGAL/Exact_predicates_exact_constructions_kernel.h> 
 #include <CGAL/Polygon_2.h>
+#include <CGAL/Polygon_with_holes_2.h>  
+#include <CGAL/Segment_2.h>
+#include <CGAL/Point_2.h>
 #include <CGAL/Random.h>
 #include <CGAL/version.h>
 
 namespace CGAL {
-    template <class P2>
+    template <typename K>
     class CenterLineViewer : public Basic_viewer_qt {
         using Base = Basic_viewer_qt;
-        using Point = typename P2::Point_2;
-        using K = CGAL::Exact_predicates_exact_constructions_kernel;
-        using Point_2 = K::Point_2;
+        using FT = typename K::FT;
+        using Point_2 = CGAL::Point_2<K>;
         using Vector_2 = CGAL::Vector_2<K>;
+        using Segment_2 = CGAL::Segment_2<K>;
         using Polygon_2 = CGAL::Polygon_2<K>;
     protected:
-        const P2& poly;
+        const Polygon_2& poly;
 
     protected:
         void compute_elements()
@@ -31,7 +33,7 @@ namespace CGAL {
             CGAL::Color c(75, 160, 255);
             face_begin(c);
 
-            for (typename P2::Vertex_const_iterator i = poly.vertices_begin();
+            for (Polygon_2::Vertex_const_iterator i = poly.vertices_begin();
                  i != poly.vertices_end(); ++i) {
                 add_point(*i);         // Add vertex
                 add_segment(prev, *i); // Add segment with previous point
@@ -62,18 +64,18 @@ namespace CGAL {
         /// @param ap2 the polygon to view
         /// @param title the title of the window
         // First draw: vertices; edges, faces; multi-color; no inverse normal
-        CenterLineViewer(QWidget* parent, const P2& ap2, const char* title = "CenterLine Viewer") : Base(parent, title, true, true, true, false, false), poly(ap2) {
+        CenterLineViewer(QWidget* parent, const Polygon_2& ap2, const char* title = "CenterLine Viewer") : Base(parent, title, true, true, true, false, false), poly(ap2) {
             // compute_elements();
         }
 
-        void drawText(const Point& loc, const QString& text) {
+        void drawText(const Point_2& loc, const QString& text) {
             // CGAL 4.14-3 don't support add_text, only have add_point and add_segment
 #if CGAL_VERSION_MAJOR >= 5
             add_text(loc, text);
 #endif
         }
 
-        void drawPoints(const std::vector<P2>& poly_list, CGAL::Color point_color = CGAL::Color(0, 255, 255)) {
+        void drawPoints(const std::vector<Polygon_2>& poly_list, CGAL::Color point_color = CGAL::Color(0, 255, 255)) {
             for (const P2& poly : poly_list) {
                 for (typename P2::Vertex_const_iterator i = poly.vertices_begin(); i != poly.vertices_end(); ++i) {
                     add_point(*i, point_color);
@@ -81,17 +83,22 @@ namespace CGAL {
             }
         }
 
-        void drawPoints(const std::vector<Point>& points, CGAL::Color point_color = CGAL::Color(0, 255, 255)) {
+        void drawPoints(const std::vector<Point_2>& points, CGAL::Color point_color = CGAL::Color(0, 255, 255)) {
             for (auto p : points)
                 add_point(p, point_color);
         }
 
-        void drawPartitions(const std::vector<P2>& poly_list, CGAL::Color segment_color = CGAL::Color(0, 0, 0), CGAL::Color face_color = CGAL::Color(67, 177, 235), CGAL::Color point_color = CGAL::Color(255, 0, 0))
+		void drawSegments(const std::vector<Segment_2>& segs, CGAL::Color seg_color = CGAL::Color(0, 0, 0)) {
+			for (auto seg : segs)
+				add_segment(seg.source(), seg.target(), seg_color);
+		}
+
+        void drawPartitions(const std::vector<Polygon_2>& poly_list, CGAL::Color segment_color = CGAL::Color(0, 0, 0), CGAL::Color face_color = CGAL::Color(67, 177, 235), CGAL::Color point_color = CGAL::Color(255, 0, 0))
         {
-            for (const P2& poly : poly_list) {
-                Point prev = poly.vertex(poly.size() - 1);
+            for (const Polygon_2& poly : poly_list) {
+                Point_2 prev = poly.vertex(poly.size() - 1);
                 face_begin(face_color);
-                for (typename P2::Vertex_const_iterator i = poly.vertices_begin(); i != poly.vertices_end(); ++i) {
+                for (Polygon_2::Vertex_const_iterator i = poly.vertices_begin(); i != poly.vertices_end(); ++i) {
                     add_point(*i, point_color);         // Add vertex
                     add_segment(prev, *i, segment_color); // Add segment with previous point
                     add_point_in_face(*i); // Add point in face
@@ -101,7 +108,7 @@ namespace CGAL {
             }
         }
 
-        void drawTree(const std::vector<Point>& point, const std::vector<std::pair<int, int>>& segment, CGAL::Color c = CGAL::Color(255, 255, 0))
+        void drawTree(const std::vector<Point_2>& point, const std::vector<std::pair<int, int>>& segment, CGAL::Color c = CGAL::Color(255, 255, 0))
         {
             // compute_elements();
             // for (auto& v : point)

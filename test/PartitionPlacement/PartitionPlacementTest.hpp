@@ -18,6 +18,7 @@ namespace ParitionPlacement
 
         using Polygon_2 = CGAL::Polygon_2<K>;
         using Polygon_with_holes_2 = CGAL::Polygon_with_holes_2<K>;
+        using Segment_2 = CGAL::Segment_2<K>;
 
         struct ControlProps {
             std::string InputFile;
@@ -105,18 +106,21 @@ namespace ParitionPlacement
         CGAL::Color Segment_Color(50, 50, 50);
 
         std::string title = "output-" + controlProps.InputFile;
-        CGAL::CenterLineViewer<Polygon_2> mainwindow(app.activeWindow(), *PolyParts_outer.begin(), title.c_str());
+        CGAL::CenterLineViewer<K> mainwindow(app.activeWindow(), *PolyParts_outer.begin(), title.c_str());
         mainwindow.move(centerX2 - mainwindow.width() / 2, screenHeight / 2 - mainwindow.height() / 2);
         mainwindow.drawPartitions(PolyParts_holes, Segment_Color, Holes_Color, Point_Color);
         mainwindow.drawPartitions(PolyParts_outer, Segment_Color, Room_Color, Point_Color);
         if (controlProps.withSimplifyBoundary) {
-			CGAL::Color Simplify_Segment_Color(100, 100, 100);
-			const Polygon_with_holes_2& polygon = ppSolver.polygon;
-			std::vector<Polygon_2> PolyParts_outer, PolyParts_holes;
-			PolyParts_outer.push_back(polygon.outer_boundary());
-			PolyParts_holes.insert(PolyParts_holes.end(), polygon.holes_begin(), polygon.holes_end());
-			mainwindow.drawPartitions(PolyParts_holes, Segment_Color, Holes_Color, Point_Color);
-			mainwindow.drawPartitions(PolyParts_outer, Segment_Color, Room_Color, Point_Color);
+            CGAL::Color Simplify_Segment_Color(150, 150, 150);
+            const Polygon_with_holes_2& polygon = ppSolver.polygon;
+            std::vector<Polygon_2> PolyParts;
+            PolyParts.push_back(polygon.outer_boundary());
+            PolyParts.insert(PolyParts.end(), polygon.holes_begin(), polygon.holes_end());
+            std::vector<Segment_2> segs;
+            for (auto& poly : PolyParts)
+                for (auto it : poly.edges())
+                    segs.push_back(it);
+            mainwindow.drawSegments(segs, Simplify_Segment_Color);
         }
         mainwindow.show();
         app.exec();
