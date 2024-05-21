@@ -1464,6 +1464,7 @@ namespace SimplifyBoundary{
         std::cout << "offset = " << props.offset << std::endl;
         const Polygon_with_holes_2& new_polygon = polygon;
 #if CGAL_VERSION_MAJOR >= 5
+        // TODO
         /*std::cout << "CGAL version: 5.x" << std::endl;
         std::vector<boost::shared_ptr<Polygon_with_holes_2>> in_offset_poly = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2(props.offset, polygon);
         std::vector<boost::shared_ptr<Polygon_with_holes_2>> ex_offset_poly = CGAL::create_exterior_skeleton_and_offset_polygons_with_holes_2(props.offset, *in_offset_poly[0]);
