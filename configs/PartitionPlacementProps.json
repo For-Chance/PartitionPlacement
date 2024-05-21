@@ -1,11 +1,13 @@
 {
     "PartitionProps": {
+        "withSimplifyBoundary": true
     },
     "PlacementProps": {
         
     },
     "ControlProps": {
         "InputFile": "../data/sample10.Info.geojson",
-        "OutputFile": ""
+        "OutputFile": "",
+        "withSimplifyBoundary": true
     }
 }

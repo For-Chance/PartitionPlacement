@@ -9,12 +9,15 @@
 #include <CGAL/partition_2.h>
 #include <list>
 
+#include "SimplifyBoundary.hpp"
+
 namespace Partition
 {
     template <typename K>
     struct PartitionProps {
+        bool withSimplifyBoundary;
         PartitionProps() {
-
+            withSimplifyBoundary = true;
         }
     };
 
@@ -33,6 +36,9 @@ namespace Partition
     public:
         Solver() {}
         Solver(const Polygon_with_holes_2& space, const PartitionProps& props = PartitionProps());
+        
+        Polygon_with_holes_2 origin_space;
+        Polygon_with_holes_2 polygon;
     };
 }
 
@@ -41,8 +47,13 @@ namespace Partition
     template <typename K>
     Solver<K>::Solver(const Polygon_with_holes_2& space, const PartitionProps& props)
     {
-        
-       
+		origin_space = space;
+        if (props.withSimplifyBoundary) {
+			SimplifyBoundary::Solver<K> sbSolver(origin_space);
+            polygon = sbSolver.simplify_space;
+        }
+		else
+			polygon = origin_space;
     }
 } // namespace Partition
 #endif // PARTITION_HPP

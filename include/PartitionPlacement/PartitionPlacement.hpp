@@ -22,6 +22,7 @@ namespace ParitionPlacement
         using PlacementProps = Placement::PlacementProps<K>;
     public:
         Polygon_with_holes_2 origin_space;
+        Polygon_with_holes_2 polygon;
     private:
         Partition::Solver<K> PartitionSolver;
         Placement::Solver<K> PlacementSolver;
@@ -42,8 +43,11 @@ namespace ParitionPlacement
     template <typename K>
     Solver<K>::Solver(const std::string& geojson, const PartitionProps& partitionProps, const PlacementProps& placementProps) {
         std::cout << "Hello PartitionPlacement" << std::endl;
+        if(geojson == "")
+			throw std::invalid_argument("\'geojson\' is empty!");
         origin_space = GeoJSON::geojson_to_Pwh<K>(geojson);
         PartitionSolver = Partition::Solver<K>(origin_space, partitionProps);
+		polygon = PartitionSolver.polygon;
         PlacementSolver = Placement::Solver<K>(placementProps);
     }
 } // namespace PartitionPlacement

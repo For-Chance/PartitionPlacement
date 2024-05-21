@@ -22,6 +22,7 @@ namespace ParitionPlacement
         struct ControlProps {
             std::string InputFile;
             std::string OutputFile;
+            bool withSimplifyBoundary;
         };
 
         PartitionPlacementTest(const std::string& config_file);
@@ -73,8 +74,10 @@ namespace ParitionPlacement
     /// <param name="controlProps"></param>
     void PartitionPlacementTest::parseConfigFile(const std::string& config_file, Context<K>& context, ControlProps& controlProps) {
         Json::Value p = GeoJSON::parse_propsjson(config_file);
+        context.ppProps.partProps.withSimplifyBoundary = p["PartitionProps"]["withSimplifyBoundary"].asBool();
         controlProps.InputFile = p["ControlProps"]["InputFile"].asString();
         controlProps.OutputFile = p["ControlProps"]["OutputFile"].asString();
+		controlProps.withSimplifyBoundary = p["ControlProps"]["withSimplifyBoundary"].asBool();
     }
 
     /// <summary>
@@ -106,6 +109,15 @@ namespace ParitionPlacement
         mainwindow.move(centerX2 - mainwindow.width() / 2, screenHeight / 2 - mainwindow.height() / 2);
         mainwindow.drawPartitions(PolyParts_holes, Segment_Color, Holes_Color, Point_Color);
         mainwindow.drawPartitions(PolyParts_outer, Segment_Color, Room_Color, Point_Color);
+        if (controlProps.withSimplifyBoundary) {
+			CGAL::Color Simplify_Segment_Color(100, 100, 100);
+			const Polygon_with_holes_2& polygon = ppSolver.polygon;
+			std::vector<Polygon_2> PolyParts_outer, PolyParts_holes;
+			PolyParts_outer.push_back(polygon.outer_boundary());
+			PolyParts_holes.insert(PolyParts_holes.end(), polygon.holes_begin(), polygon.holes_end());
+			mainwindow.drawPartitions(PolyParts_holes, Segment_Color, Holes_Color, Point_Color);
+			mainwindow.drawPartitions(PolyParts_outer, Segment_Color, Room_Color, Point_Color);
+        }
         mainwindow.show();
         app.exec();
     }

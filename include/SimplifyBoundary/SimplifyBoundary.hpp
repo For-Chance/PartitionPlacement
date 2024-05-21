@@ -14,6 +14,7 @@
 #include <CGAL/Polyline_simplification_2/simplify.h>
 #include <CGAL/Polyline_simplification_2/Squared_distance_cost.h>
 #include <CGAL/version.h>
+#include <boost/functional/hash.hpp>
 
 namespace PS = CGAL::Polyline_simplification_2;
 
@@ -37,9 +38,8 @@ namespace SimplifyBoundary {
             k1,
             k2,
             thre_max_multipe,
-            thre_gap_node_num,
-            isRemerge,
-            isProcess;
+            thre_gap_node_num;
+        bool isRemerge, isProcess;
         SimplifyProps() {
             search_convex_area_thre = 0.1;
             search_concave_area_thre = 0.002;
@@ -101,14 +101,20 @@ namespace SimplifyBoundary {
         struct SLNode;
         class SLList;
 
+		using SimplifyProps = SimplifyProps<K>;
+		using ExpandProps = ExpandProps<K>;
+
         int simplify_status;
-        Polygon_with_holes_2 simplify_border(const Polygon_with_holes_2& polygon, const SimplifyProps<K>& props);
+        Polygon_with_holes_2 simplify_border(const Polygon_with_holes_2& polygon, const SimplifyProps& props);
         class SmoothMethod;
         std::pair<std::vector<Polygon_2>, std::vector<Polygon_2>> split_non_simple_polygon(const Polygon_2& polygon);
         struct point_hash {
             std::size_t operator()(const Point_2& p) const
             {
-                return std::hash<FT>()(p.x()) ^ std::hash<FT>()(p.y());
+                std::size_t seed = 0;
+                boost::hash_combine(seed, CGAL::to_double(p.x()));
+                boost::hash_combine(seed, CGAL::to_double(p.y()));
+                return seed;
             }
         };
         struct point_equal {
@@ -138,15 +144,15 @@ namespace SimplifyBoundary {
         void processPoly(std::shared_ptr<SLNode> cur, std::shared_ptr<SLNode> next, const Polygon_2& best_poly, const SimplifyBoxProps& props);
         void simplify_box(SLList& ls, const std::vector<FT>& ManhattanDistance, const SimplifyBoxProps& props);
         // Extra solver for extra cases
-        inline Polygon_with_holes_2 simplify(const Polygon_with_holes_2& polygon, const SimplifyProps<K>& Sprops, const ExpandProps<K>& Eprops);
-        Polygon_with_holes_2 create_exterior_offset_polygons_with_holes_2(const FT& offset, const Polygon_with_holes_2& polygon) {
-            std::vector<boost::shared_ptr<Polygon_2>> out_ob_poly = CGAL::create_exterior_skeleton_and_offset_polygons_2(offset, polygon.outer_boundary());
+        inline Polygon_with_holes_2 simplify(const Polygon_with_holes_2& polygon, const SimplifyProps& Sprops, const ExpandProps& Eprops);
+        inline Polygon_with_holes_2 create_exterior_offset_polygons_with_holes_2(const FT& offset, const Polygon_with_holes_2& polygon) {
+            std::vector<boost::shared_ptr<Polygon_2>> out_ob_poly = CGAL::create_exterior_skeleton_and_offset_polygons_2<FT, Polygon_2, Polygon_2>(offset, polygon.outer_boundary());
             Polygon_2 new_ob = *out_ob_poly[1];
             std::cout << "new_ob orientation = " << new_ob.is_clockwise_oriented() << std::endl;
             new_ob.reverse_orientation();
             std::vector<Polygon_2> new_holes;
             for (auto it = polygon.holes_begin(); it != polygon.holes_end(); it++) {
-                std::vector<boost::shared_ptr<Polygon_2>> ex_poly = CGAL::create_exterior_skeleton_and_offset_polygons_2(offset, *it);
+                std::vector<boost::shared_ptr<Polygon_2>> ex_poly = CGAL::create_exterior_skeleton_and_offset_polygons_2<FT, Polygon_2, Polygon_2>(offset, *it);
                 Polygon_2 temp_poly = *ex_poly[1];
                 temp_poly.reverse_orientation();
                 std::cout << "hole orientation = " << temp_poly.is_clockwise_oriented() << std::endl;
@@ -155,9 +161,9 @@ namespace SimplifyBoundary {
             Polygon_with_holes_2 new_polygon(new_ob, new_holes.begin(), new_holes.end());
             return new_polygon;
         };
-        Polygon_with_holes_2 shrink_and_expand(const Polygon_with_holes_2& polygon, const ExpandProps<K>& props);
-        Polygon_with_holes_2 shrink_and_expand2(const Polygon_with_holes_2& polygon, const ExpandProps<K>& props);
-        Polygon_with_holes_2 tri_simplify(const Polygon_with_holes_2& polygon, const ExpandProps<K>& props);
+        inline Polygon_with_holes_2 shrink_and_expand(const Polygon_with_holes_2& polygon, const ExpandProps& props);
+        inline Polygon_with_holes_2 shrink_and_expand2(const Polygon_with_holes_2& polygon, const ExpandProps& props);
+        inline Polygon_with_holes_2 tri_simplify(const Polygon_with_holes_2& polygon, const ExpandProps& props);
 
         struct pair_hash;
         void construct_line(std::unordered_map<int, int>& loc2degree, const int& loc, const int& last_id, std::unordered_set<std::pair<int, int>, pair_hash>& done_edges, std::vector<Point_2>& line);
@@ -219,11 +225,12 @@ namespace SimplifyBoundary {
             static FT F23(FT t) { return 1.0 / 6 * (-3 * t * t * t + 3 * t * t + 3 * t + 1); }
             static FT F33(FT t) { return 1.0 / 6 * t * t * t; }
         };
-        void simplify_line(std::vector<Point_2>& line, const SimplifyProps<K>& props);
-        void smooth_segments2(std::unordered_map<int, int>& loc2degree, std::vector<Segment_2>& result, const SimplifyProps<K>& props, const int& insertNum);
+        void simplify_line(std::vector<Point_2>& line, const SimplifyProps& props);
+        void smooth_segments2(std::unordered_map<int, int>& loc2degree, std::vector<Segment_2>& result, const SimplifyProps& props, const int& insertNum);
     public:
         Solver(){}
-        Solver(const std::string& geojson = "", const SimplifyProps<K>& simplifyProps = SimplifyProps<K>(), const ExpandProps<K>& expandProps = ExpandProps<K>());
+        Solver(const std::string& geojson = "", const SimplifyProps& simplifyProps = SimplifyProps(), const ExpandProps& expandProps = ExpandProps());
+		Solver(const Polygon_with_holes_2& space, const SimplifyProps& simplifyProps = SimplifyProps(), const ExpandProps& expandProps = ExpandProps());
 
         Polygon_with_holes_2 simplify_space;
         std::vector<Polygon_2> origin_polys;
@@ -253,14 +260,14 @@ namespace SimplifyBoundary {
         }
         static FT Cosine(const Vector_2& a, const Vector_2& b) 
         {
-            return inner_product(a, b) / CGAL::sqrt(a.squared_length() * b.squared_length());
+            return inner_product(a, b) / CGAL::approximate_sqrt(a.squared_length() * b.squared_length());
         }
         static FT Sine(const Vector_2& a, const Vector_2& b)
         {
-            return outer_product(a, b) / CGAL::sqrt(a.squared_length() * b.squared_length());
+            return outer_product(a, b) / CGAL::approximate_sqrt(a.squared_length() * b.squared_length());
         }
         static FT get_vec_len(Vector_2 vec) {
-            return CGAL::sqrt(vec.squared_length());
+            return CGAL::approximate_sqrt(vec.squared_length());
         }
         static Vector_2 get_vec_unit(Vector_2 vec) {
             FT len = get_vec_len(vec);
@@ -270,7 +277,7 @@ namespace SimplifyBoundary {
             if (x <= 0)
                 return b;
             else
-                return std::max((b - a) * (std::exp((-k) * x)) + a, (b - a) * (std::exp(k * (x - 1))) + a);
+                return std::max((b - a) * (std::exp(CGAL::to_double((-k) * x))) + a, (b - a) * (std::exp(CGAL::to_double(k * (x - 1)))) + a);
         };
         static FT get_cos_theta(const FT& v1_len, const FT& v2_len, const FT& a, const FT& b, const FT& k) {
             if (v1_len < 0 || v2_len < 0)
@@ -281,7 +288,7 @@ namespace SimplifyBoundary {
             return cos_theta;
         }
         static FT get_theta_function2(const FT& a, const FT& b, const FT& x, const FT& k) {
-            return (b - a) * (1 - std::exp((-k) * (x - 1))) + a;
+            return (b - a) * (1 - std::exp(CGAL::to_double((-k) * (x - 1)))) + a;
         }
         static FT get_cos_theta(const int& v1_num, const int& v2_num, const FT& a, const FT& b, const FT& k1, const FT& k2) {
             FT cos_theta1 = get_theta_function2(a, b, v1_num, k2);
@@ -301,7 +308,7 @@ namespace SimplifyBoundary {
             //std::cout << "a = " << a << ", b = " << b << ", v1_num = " << v1_num << ", v2_num = " << v2_num << ", cos_theta1 = " << cos_theta1 << ", cos_theta2 = " << cos_theta2 << ", res = " << res << std::endl;
             return res;
         }
-        static FT judge_one_side(const Line_2& temp_line, const Point_2& p1, const Point_2& p2) {
+        static bool judge_one_side(const Line_2& temp_line, const Point_2& p1, const Point_2& p2) {
             bool is_one_side = true;
             FT s1, s2;
             if (temp_line.b() != 0) {
@@ -334,12 +341,27 @@ namespace SimplifyBoundary {
 
 namespace SimplifyBoundary{
     template <typename K>
-    Solver<K>::Solver(const std::string& geojson, const SimplifyProps<K>& simplifyProps = SimplifyProps<K>(), const ExpandProps<K>& expandProps = ExpandProps<K>()) {
+    Solver<K>::Solver(const std::string& geojson, const SimplifyProps& simplifyProps = SimplifyProps(), const ExpandProps& expandProps = ExpandProps()) {
         // set precision
         CGAL_setting();
         try {
             origin_space = GeoJSON::geojson_to_Pwh<K>(geojson);
             simplify_space = simplify(origin_space, simplifyProps, expandProps);
+        }
+        catch (const std::exception& e) {
+            std::cerr << "!Error at SimplifyBoundary Module: " << e.what() << std::endl;
+        }
+        catch (...) {
+            std::cerr << "!Caught unknown exception" << std::endl;
+        }
+    }
+
+    template <typename K>
+    Solver<K>::Solver(const Polygon_with_holes_2& space, const SimplifyProps& simplifyProps = SimplifyProps(), const ExpandProps& expandProps = ExpandProps()) {
+        // set precision
+        CGAL_setting();
+        try {
+            simplify_space = simplify(space, simplifyProps, expandProps);
         }
         catch (const std::exception& e) {
             std::cerr << "!Error at SimplifyBoundary Module: " << e.what() << std::endl;
@@ -743,7 +765,7 @@ namespace SimplifyBoundary{
     };
 
     template <typename K>
-    inline CGAL::Polygon_with_holes_2<K> Solver<K>::simplify_border(const Polygon_with_holes_2& polygon, const SimplifyProps<K>& props) {
+    inline CGAL::Polygon_with_holes_2<K> Solver<K>::simplify_border(const Polygon_with_holes_2& polygon, const SimplifyProps& props) {
         origin_polys.push_back(polygon.outer_boundary());
         for (auto it = polygon.holes_begin(); it != polygon.holes_end(); ++it)
             origin_polys.push_back(*it);
@@ -760,9 +782,9 @@ namespace SimplifyBoundary{
             true_area += hole.area();
         }
         FT multi_num = (true_area / outer_area);
-        const double max_area_threshold_of_convex_box = props.search_convex_area_thre * multi_num;
-        const double max_area_threshold_of_concave_box = props.search_concave_area_thre * multi_num;
-        const double max_area_threshold_of_del_box = props.del_area_thre * multi_num;
+        const FT max_area_threshold_of_convex_box = props.search_convex_area_thre * multi_num;
+        const FT max_area_threshold_of_concave_box = props.search_concave_area_thre * multi_num;
+        const FT max_area_threshold_of_del_box = props.del_area_thre * multi_num;
 
         FT outer_width = outer.right_vertex()->x() - outer.left_vertex()->x();
         FT outer_height = outer.top_vertex()->y() - outer.bottom_vertex()->y();
@@ -772,10 +794,10 @@ namespace SimplifyBoundary{
         SBprops.MAX_SEARCH_X = outer_width * props.search_thre;
         SBprops.MAX_SEARCH_Y = outer_height * props.search_thre;
         SBprops.MAX_DEL_AREA = true_area * max_area_threshold_of_del_box;
-        SBprops.MAX_DEL_BBS_WIDTH = CGAL::sqrt(outer_width * outer_width + outer_height * outer_height) * props.del_bbs_width_thre;
+        SBprops.MAX_DEL_BBS_WIDTH = CGAL::approximate_sqrt(outer_width * outer_width + outer_height * outer_height) * props.del_bbs_width_thre;
         SBprops.NOT_DEL_PBRATE = props.not_del_pbrate;
-        SBprops.MAX_COS_THETA_BE_ONE_LINE = std::cos(MIN_THETA_BE_ONE_LINE * M_PI / 180);
-        SBprops.MAX_COS_THETA_BE_ONE_TREND = std::cos(MIN_THETA_BE_ONE_TREND * M_PI / 180);
+        SBprops.MAX_COS_THETA_BE_ONE_LINE = std::cos(CGAL::to_double(MIN_THETA_BE_ONE_LINE * M_PI / 180));
+        SBprops.MAX_COS_THETA_BE_ONE_TREND = std::cos(CGAL::to_double(MIN_THETA_BE_ONE_TREND * M_PI / 180));
         SBprops.k1 = props.k1;
         SBprops.k2 = props.k2;
         SBprops.THRESHOLD_MAX_MULTIPE = props.thre_max_multipe;
@@ -799,7 +821,7 @@ namespace SimplifyBoundary{
             FT max_vec_len = -1, vec_len;
             int start_id = 0;
             for (int i = 1; i < SBprops.POINTS_SIZE; i++) {
-                vec_len = CGAL::sqrt(CGAL::squared_distance(poly[i], poly[i - 1]));
+                vec_len = CGAL::approximate_sqrt(CGAL::squared_distance(poly[i], poly[i - 1]));
                 ManhattanDistance[i] = ManhattanDistance[i - 1] + vec_len;
                 //printf("vec_len = %.2f, MD[%d] = %.2f\n", vec_len, i, ManhattanDistance[i]);
                 if (max_vec_len < vec_len) {
@@ -807,7 +829,7 @@ namespace SimplifyBoundary{
                     start_id = i;
                 }
             }
-            vec_len = CGAL::sqrt(CGAL::squared_distance(poly[0], poly[SBprops.POINTS_SIZE - 1]));
+            vec_len = CGAL::approximate_sqrt(CGAL::squared_distance(poly[0], poly[SBprops.POINTS_SIZE - 1]));
             ManhattanDistance[0] = ManhattanDistance[SBprops.POINTS_SIZE - 1] + vec_len;
             SBprops.MIN_DEL_MDIS = ManhattanDistance[SBprops.POINTS_SIZE - 1] * props.del_mdis_thre;
             SBprops.START_ID = start_id;
@@ -975,7 +997,7 @@ namespace SimplifyBoundary{
             pre_line_num = preNode->line_num;
             next_line_num = nextNode->line_num;
 
-            MIN_ADD_LINE_NUM = ceil(curNode->start_vec_len / ((pre_avg_len * pre_line_num + next_avg_len * next_line_num) / (pre_line_num + next_line_num)));
+            MIN_ADD_LINE_NUM = std::ceil(CGAL::to_double(curNode->start_vec_len / ((pre_avg_len * pre_line_num + next_avg_len * next_line_num) / (pre_line_num + next_line_num))));
         }
         std::vector<Point_2> ChaikinSolver(const FT& MAX_COS_THETA, const Point_2& outer_point = Point_2(0, 0)) {
             if (Cosine(pre_end_vec, next_start_vec) <= MAX_COS_THETA)
@@ -1177,7 +1199,7 @@ namespace SimplifyBoundary{
 
         // the bbs is ok?
         Polygon_2 temp_poly = poly;
-        Vector_2 normalized_v = base_v / CGAL::sqrt(base_v.squared_length());
+        Vector_2 normalized_v = base_v / CGAL::approximate_sqrt(base_v.squared_length());
         FT bbs_width = calculateProjectionLength(temp_poly, normalized_v);
         FT bbs_height = calculateProjectionLength(temp_poly, Vector_2(-normalized_v.y(), normalized_v.x()));
         FT bbs_area = bbs_width * bbs_height;
@@ -1210,7 +1232,7 @@ namespace SimplifyBoundary{
                 Vector_2 base_v, normalized_v, perpendicular_v;
                 FT bbs_width, bbs_height;
                 base_v = Vector_2(temp_cur->point, best_next->point);
-                normalized_v = base_v / CGAL::sqrt(base_v.squared_length());
+                normalized_v = base_v / CGAL::approximate_sqrt(base_v.squared_length());
                 perpendicular_v = Vector_2(-normalized_v.y(), normalized_v.x());
                 bbs_width = calculateProjectionLength(best_poly, normalized_v);
                 bbs_height = calculateProjectionLength(best_poly, perpendicular_v);
@@ -1328,7 +1350,7 @@ namespace SimplifyBoundary{
                 const FT threshold_max_multipe = props.THRESHOLD_MAX_MULTIPE;
                 Vector_2 right_vec_unit = nextnextNode->start_vec_unit;
                 FT right_vec_len = nextnextNode->start_vec_len;
-                FT num1, num2;
+                int num1, num2;
                 if (nextnextNode->line_num == 1 && right_vec_len < (cur2next_len / threshold_max_multipe) && nextnextNode->next->id != -1 && right_vec_len < (nextnextNode->next->avg_len / threshold_max_multipe))
                     num2 = nextnextNode->next->line_num;
                 else
@@ -1408,7 +1430,8 @@ namespace SimplifyBoundary{
     }
 
     template <typename K>
-    inline CGAL::Polygon_with_holes_2<K> Solver<K>::simplify(const Polygon_with_holes_2& polygon, const SimplifyProps<K>& Sprops, const ExpandProps<K>& Eprops) {
+    inline CGAL::Polygon_with_holes_2<K> Solver<K>::simplify(const Polygon_with_holes_2& polygon, const SimplifyProps& Sprops, const ExpandProps& Eprops) {
+		std::cout << "*****************************\tstart simplify\t*****************************" << std::endl;
         Polygon_with_holes_2 new_polygon = polygon;
         for (char c : Eprops.simplify_order)
             switch (c) {
@@ -1425,12 +1448,13 @@ namespace SimplifyBoundary{
                 new_polygon = tri_simplify(new_polygon, Eprops);
                 break;
             }
+		std::cout << "*****************************\tend simplify\t*****************************" << std::endl;
         return new_polygon;
     }
 
     // shrink->expand
     template <typename K>
-    inline CGAL::Polygon_with_holes_2<K> Solver<K>::shrink_and_expand(const Polygon_with_holes_2& polygon, const ExpandProps<K>& props) {
+    inline CGAL::Polygon_with_holes_2<K> Solver<K>::shrink_and_expand(const Polygon_with_holes_2& polygon, const ExpandProps& props) {
         if (props.offset <= 0) {
             std::cout << "Warning!: offset is 0." << std::endl;
             return polygon;
@@ -1438,15 +1462,15 @@ namespace SimplifyBoundary{
 
         std::cout << "shrink_and_expand" << std::endl;
         std::cout << "offset = " << props.offset << std::endl;
-
+        const Polygon_with_holes_2& new_polygon = polygon;
 #if CGAL_VERSION_MAJOR >= 5
-        std::cout << "CGAL version: 5.x" << std::endl;
+        /*std::cout << "CGAL version: 5.x" << std::endl;
         std::vector<boost::shared_ptr<Polygon_with_holes_2>> in_offset_poly = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2(props.offset, polygon);
         std::vector<boost::shared_ptr<Polygon_with_holes_2>> ex_offset_poly = CGAL::create_exterior_skeleton_and_offset_polygons_with_holes_2(props.offset, *in_offset_poly[0]);
-        const Polygon_with_holes_2& new_polygon = *ex_offset_poly[0];
+        const Polygon_with_holes_2& new_polygon = *ex_offset_poly[0];*/
 #else
         std::cout << "CGAL version: 4.x" << std::endl;
-        std::vector<boost::shared_ptr<Polygon_with_holes_2>> in_offset_poly = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2(props.offset, polygon);
+        std::vector<boost::shared_ptr<Polygon_with_holes_2>> in_offset_poly = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2<FT, Polygon_with_holes_2, Polygon_with_holes_2>(props.offset, polygon);
         const Polygon_with_holes_2& in_Polygon = *in_offset_poly[0];
         Polygon_with_holes_2 new_polygon = create_exterior_offset_polygons_with_holes_2(props.offset, in_Polygon);
 #endif
@@ -1456,7 +1480,7 @@ namespace SimplifyBoundary{
 
     // shrink->expand->shrink
     template <typename K>
-    inline CGAL::Polygon_with_holes_2<K> Solver<K>::shrink_and_expand2(const Polygon_with_holes_2& polygon, const ExpandProps<K>& props) {
+    inline CGAL::Polygon_with_holes_2<K> Solver<K>::shrink_and_expand2(const Polygon_with_holes_2& polygon, const ExpandProps& props) {
         if (props.offset <= 0) {
             std::cout << "Warning!: offset is 0." << std::endl;
             return polygon;
@@ -1465,18 +1489,18 @@ namespace SimplifyBoundary{
         std::cout << "shrink_and_expand2" << std::endl;
 
         std::cout << "offset = " << props.offset << std::endl;
-
+        const Polygon_with_holes_2& new_polygon = polygon;
         // cgal 4.14-3 don't support CGAL::create_exterior_skeleton_and_offset_polygons_with_holes_2 with parameter of Poly_with_holes_2
 #if CGAL_VERSION_MAJOR >= 5
-        std::vector<boost::shared_ptr<Polygon_with_holes_2>> in_offset_poly = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2(props.offset, polygon);
-        std::vector<boost::shared_ptr<Polygon_with_holes_2>> ex_offset_poly = CGAL::create_exterior_skeleton_and_offset_polygons_with_holes_2(props.offset * 2, *in_offset_poly[0]);
-        std::vector<boost::shared_ptr<Polygon_with_holes_2>> in_offset_poly2 = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2(props.offset, *ex_offset_poly[0]);
-        const Polygon_with_holes_2& new_polygon = *in_offset_poly2[0];
+        /*std::vector<boost::shared_ptr<Polygon_with_holes_2>> in_offset_poly = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2<FT, Polygon_with_holes_2, Polygon_with_holes_2>(props.offset, polygon);
+        std::vector<boost::shared_ptr<Polygon_with_holes_2>> ex_offset_poly = CGAL::create_exterior_skeleton_and_offset_polygons_with_holes_2<FT, Polygon_with_holes_2, Polygon_with_holes_2>(props.offset * 2, *in_offset_poly[0]);
+        std::vector<boost::shared_ptr<Polygon_with_holes_2>> in_offset_poly2 = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2<FT, Polygon_with_holes_2, Polygon_with_holes_2>(props.offset, *ex_offset_poly[0]);
+        const Polygon_with_holes_2& new_polygon = *in_offset_poly2[0];*/
 #else
-        std::vector<boost::shared_ptr<Polygon_with_holes_2>> in_offset_poly = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2(props.offset, polygon);
+        std::vector<boost::shared_ptr<Polygon_with_holes_2>> in_offset_poly = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2<FT, Polygon_with_holes_2, Polygon_with_holes_2>(props.offset, polygon);
         const Polygon_with_holes_2& in_Polygon = *in_offset_poly[0];
         Polygon_with_holes_2 ex_offset_poly = create_exterior_offset_polygons_with_holes_2(props.offset * 2, in_Polygon);
-        std::vector<boost::shared_ptr<Polygon_with_holes_2>> in_offset_poly2 = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2(props.offset, ex_offset_poly);
+        std::vector<boost::shared_ptr<Polygon_with_holes_2>> in_offset_poly2 = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2<FT, Polygon_with_holes_2, Polygon_with_holes_2>(props.offset, ex_offset_poly);
         const Polygon_with_holes_2& new_polygon = *in_offset_poly2[0];
 #endif
         std::cout << "shrink and expand done" << std::endl;
@@ -1484,7 +1508,7 @@ namespace SimplifyBoundary{
     }
 
     template <typename K>
-    inline CGAL::Polygon_with_holes_2<K> Solver<K>::tri_simplify(const Polygon_with_holes_2& polygon, const ExpandProps<K>& props) {
+    inline CGAL::Polygon_with_holes_2<K> Solver<K>::tri_simplify(const Polygon_with_holes_2& polygon, const ExpandProps& props) {
         if (props.tri_simplify_cost >= 1) {
             std::cout << "Warning!: simplify_cost is greater than or equal to 1.";
             return polygon;
@@ -1494,7 +1518,7 @@ namespace SimplifyBoundary{
 
         // CGAL 4.14-3 don't support Polygon_with_holes_2 in PS:simplify
 #if CGAL_VERSION_MAJOR >= 5
-        Polygon_with_holes_2 new_polygon = PS::simplify(polygon, cost, Stop(props.tri_simplify_cost));
+        Polygon_with_holes_2 new_polygon = PS::simplify(polygon, cost, Stop(CGAL::to_double(props.tri_simplify_cost)));
 #else
         Polygon_2 new_ob;
         std::vector<Polygon_2> new_holes;
@@ -1564,7 +1588,7 @@ namespace SimplifyBoundary{
     }
 
     template <typename K>
-    inline void Solver<K>::simplify_line(std::vector<Point_2>& line, const SimplifyProps<K>& props) {
+    inline void Solver<K>::simplify_line(std::vector<Point_2>& line, const SimplifyProps& props) {
         const int POINTS_SIZE = line.size();
 
         std::vector<FT>ManhattanDistance(POINTS_SIZE);
@@ -1794,7 +1818,7 @@ namespace SimplifyBoundary{
     }
 
     template <typename K>
-    inline void Solver<K>::smooth_segments2(std::unordered_map<int, int>& loc2degree, std::vector<Segment_2>& result, const SimplifyProps<K>& props, const int& insertNum) {
+    inline void Solver<K>::smooth_segments2(std::unordered_map<int, int>& loc2degree, std::vector<Segment_2>& result, const SimplifyProps& props, const int& insertNum) {
         std::vector<std::vector<Point_2>> lines_group;
         split_to_lines(loc2degree, lines_group);
 

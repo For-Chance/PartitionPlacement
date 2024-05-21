@@ -7,6 +7,7 @@
 #include <CGAL/Polygon_2.h>
 #include <CGAL/Polygon_with_holes_2.h>
 #include <CGAL/Vector_2.h>
+#include <CGAL/Segment_2.h>
 namespace GeoJSON
 {
     struct Point {
