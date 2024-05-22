@@ -8,6 +8,7 @@
 #include <CGAL/Polygon_with_holes_2.h>
 #include <CGAL/Polygon_2.h>
 #include <CGAL/Point_2.h>
+#include <CGAL/Segment_2.h>
 
 namespace ParitionPlacement
 {
@@ -17,12 +18,15 @@ namespace ParitionPlacement
         using Polygon_with_holes_2 = CGAL::Polygon_with_holes_2<K>;
         using Polygon_2 = CGAL::Polygon_2<K>;
         using Point_2 = CGAL::Point_2<K>;
+		using Segment_2 = CGAL::Segment_2<K>;
 
         using PartitionProps = Partition::PartitionProps<K>;
         using PlacementProps = Placement::PlacementProps<K>;
     public:
         Polygon_with_holes_2 origin_space;
         Polygon_with_holes_2 polygon;
+        std::vector<Segment_2> get_skeleton_segmnts() const { return PartitionSolver.skeleton_segments; }
+		std::vector<Polygon_2> get_skeleton_faces() const { return PartitionSolver.skeleton_faces; }
     private:
         Partition::Solver<K> PartitionSolver;
         Placement::Solver<K> PlacementSolver;

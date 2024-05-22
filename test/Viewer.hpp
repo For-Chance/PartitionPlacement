@@ -1,4 +1,5 @@
 #include <string>
+#include <random>
 #include <CGAL/Qt/Basic_viewer_qt.h>
 #ifdef CGAL_USE_BASIC_VIEWER
 #include <CGAL/Polygon_2.h>
@@ -101,6 +102,26 @@ namespace CGAL {
                 for (Polygon_2::Vertex_const_iterator i = poly.vertices_begin(); i != poly.vertices_end(); ++i) {
                     add_point(*i, point_color);         // Add vertex
                     add_segment(prev, *i, segment_color); // Add segment with previous point
+                    add_point_in_face(*i); // Add point in face
+                    prev = *i;
+                }
+                face_end();
+            }
+        }
+
+        void drawPartitions_withRandomColor(const std::vector <Polygon_2>& poly_list) {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_int_distribution<> dis(0, 255);
+
+            for (const Polygon_2& poly : poly_list) {
+                CGAL::Color random_color(dis(gen), dis(gen), dis(gen));
+
+                Point_2 prev = poly.vertex(poly.size() - 1);
+                face_begin(random_color);
+                for (Polygon_2::Vertex_const_iterator i = poly.vertices_begin(); i != poly.vertices_end(); ++i) {
+                    add_point(*i, random_color);         // Add vertex
+                    add_segment(prev, *i, random_color); // Add segment with previous point
                     add_point_in_face(*i); // Add point in face
                     prev = *i;
                 }

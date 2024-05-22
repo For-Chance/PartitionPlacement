@@ -8,6 +8,7 @@
     "ControlProps": {
         "InputFile": "../data/sample10.Info.geojson",
         "OutputFile": "",
-        "withSimplifyBoundary": true
+        "withSimplifyBoundary": true,
+        "showSkeletonFaces": false
     }
 }

@@ -7,6 +7,7 @@
 #include <CGAL/Exact_predicates_exact_constructions_kernel.h>
 #include <CGAL/Polygon_2.h>
 #include <CGAL/Polygon_with_holes_2.h>
+#include <CGAL/Segment_2.h>
 
 namespace ParitionPlacement 
 {
@@ -24,6 +25,7 @@ namespace ParitionPlacement
             std::string InputFile;
             std::string OutputFile;
             bool withSimplifyBoundary;
+            bool showSkeletonFaces;
         };
 
         PartitionPlacementTest(const std::string& config_file);
@@ -79,6 +81,7 @@ namespace ParitionPlacement
         controlProps.InputFile = p["ControlProps"]["InputFile"].asString();
         controlProps.OutputFile = p["ControlProps"]["OutputFile"].asString();
 		controlProps.withSimplifyBoundary = p["ControlProps"]["withSimplifyBoundary"].asBool();
+		controlProps.showSkeletonFaces = p["ControlProps"]["showSkeletonFaces"].asBool();
     }
 
     /// <summary>
@@ -88,6 +91,8 @@ namespace ParitionPlacement
     void PartitionPlacementTest::showResult(const Solver<K>& ppSolver) {
         std::cout << "Show Result:" << std::endl;
         const Polygon_with_holes_2& space = ppSolver.origin_space;
+		const std::vector<Segment_2>& skeleton_segments = ppSolver.get_skeleton_segmnts();
+		const std::vector<Polygon_2>& skeleton_faces = ppSolver.get_skeleton_faces();
         std::vector<Polygon_2> PolyParts_outer, PolyParts_holes;
         PolyParts_outer.push_back(space.outer_boundary());
         PolyParts_holes.insert(PolyParts_holes.end(), space.holes_begin(), space.holes_end());
@@ -104,12 +109,19 @@ namespace ParitionPlacement
         CGAL::Color Room_Color(67, 177, 235);
         CGAL::Color Holes_Color(255, 255, 255);
         CGAL::Color Segment_Color(50, 50, 50);
+        CGAL::Color Skeleton_Color(0, 255, 0);
 
         std::string title = "output-" + controlProps.InputFile;
         CGAL::CenterLineViewer<K> mainwindow(app.activeWindow(), *PolyParts_outer.begin(), title.c_str());
         mainwindow.move(centerX2 - mainwindow.width() / 2, screenHeight / 2 - mainwindow.height() / 2);
-        mainwindow.drawPartitions(PolyParts_holes, Segment_Color, Holes_Color, Point_Color);
-        mainwindow.drawPartitions(PolyParts_outer, Segment_Color, Room_Color, Point_Color);
+        if (controlProps.showSkeletonFaces) {
+            mainwindow.drawPartitions_withRandomColor(skeleton_faces);
+        }
+        else {
+            mainwindow.drawPartitions(PolyParts_holes, Segment_Color, Holes_Color, Point_Color);
+            mainwindow.drawPartitions(PolyParts_outer, Segment_Color, Room_Color, Point_Color);
+            mainwindow.drawSegments(skeleton_segments, Skeleton_Color);
+        }
         if (controlProps.withSimplifyBoundary) {
             CGAL::Color Simplify_Segment_Color(150, 150, 150);
             const Polygon_with_holes_2& polygon = ppSolver.polygon;
