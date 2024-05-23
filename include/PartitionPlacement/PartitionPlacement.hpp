@@ -26,7 +26,11 @@ namespace ParitionPlacement
         Polygon_with_holes_2 origin_space;
         Polygon_with_holes_2 polygon;
         std::vector<Segment_2> get_skeleton_segmnts() const { return PartitionSolver.skeleton_segments; }
+		std::vector<Segment_2> get_skeleton_centerlines() const { return PartitionSolver.skeleton_centerlines; }
+		std::vector<Segment_2> get_skeleton_otherlines() const { return PartitionSolver.skeleton_otherlines; }
 		std::vector<Polygon_2> get_skeleton_faces() const { return PartitionSolver.skeleton_faces; }
+		std::vector<std::vector<Polygon_2>> get_init_partition() const{ return PartitionSolver.init_partition; }
+		std::vector<Polygon_2> get_uncertain_parts() const { return PartitionSolver.uncertain_parts; }
     private:
         Partition::Solver<K> PartitionSolver;
         Placement::Solver<K> PlacementSolver;
