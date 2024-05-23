@@ -68,6 +68,22 @@ namespace Partition
 			std::cout << "skeleton built! Time elapsed:" << diff.count() << " s, num of skeleton face:" << skeleton->size_of_faces()<< std::endl;
             return skeleton;
         };
+        /// <summary>
+        /// get  Polygon_2 from a Face_handle
+        /// </summary>
+        /// <param name="face"></param>
+        /// <returns></returns>
+        Polygon_2 get_Poly_from_Face(const Face_handle& face) {
+            Polygon_2 poly;
+            Halfedge_handle h = face->halfedge();
+            Halfedge_handle first = h;
+            do {
+                Point_2 point = h->vertex()->point();
+                poly.push_back(point);
+                h = h->next();
+            } while (h != first);
+            return poly;
+        }
     public:
         Solver() {}
         Solver(const Polygon_with_holes_2& space, const PartitionProps& props = PartitionProps());
@@ -106,20 +122,9 @@ namespace Partition
 			std::cout << "partition..." << std::endl;
             // 3. partition
             // 3.1 save to skeleton_faces
-			auto get_poly_from_face = [](Face_handle face) {
-				Polygon_2 poly;
-				Halfedge_handle h = face->halfedge();
-				Halfedge_handle first = h;
-				do {
-					Point_2 point = h->vertex()->point();
-					poly.push_back(point);
-					h = h->next();
-				} while (h != first);
-				return poly;
-				};
             for (Face_iterator it = this->skeleton->faces_begin(); it != this->skeleton->faces_end(); ++it) {
                 Face_handle face = it;
-                skeleton_faces.push_back(get_poly_from_face(face));
+                skeleton_faces.push_back(get_Poly_from_Face(face));
             }
             // 3.2 find center line
             // first we try to make skeleton of no connect boundary is center line
@@ -239,16 +244,40 @@ namespace Partition
                 }
                 if (part_num != -1) {  // certain
 					certain_faces[part_num].insert(face);
-                    init_partition[part_num].push_back(get_poly_from_face(face));
+                    init_partition[part_num].push_back(get_Poly_from_Face(face));
                 }
                 else {  // uncertain
                     uncertain_faces.push_back(face);
-					uncertain_parts.push_back(get_poly_from_face(face));
+					uncertain_parts.push_back(get_Poly_from_Face(face));
                 }
 			}
 
             // spilit uncertain faces
+            auto areTwoIntersectionPoints = [](const Polygon_2& polygon, const Segment_2& segment) {
+                std::vector<Point_2> intersection_points;
+
+                for (auto edge = polygon.edges_begin(); edge != polygon.edges_end(); ++edge) {
+                    auto result = CGAL::intersection(*edge, segment);
+                    if (result) {
+                        if (const Point_2* p = boost::get<Point_2>(&*result)) {
+                            if (std::find(intersection_points.begin(), intersection_points.end(), *p) == intersection_points.end()) {
+                                intersection_points.push_back(*p);
+                            }
+                        }
+                        else if (const Segment_2* s = boost::get<Segment_2>(&*result)) {
+                            return false;
+                        }
+                    }
+
+                    if (intersection_points.size() > 2) {
+                        return false;
+                    }
+                }
+
+                return intersection_points.size() == 2;
+                };
             for (Face_handle face : uncertain_faces) {
+                Polygon_2 poly = get_Poly_from_Face(face);
                 Halfedge_handle border_edge;
                 Vertex_handle split_vertex;
                 Halfedge_handle h = face->halfedge();
@@ -270,10 +299,12 @@ namespace Partition
                 Segment_2 border_seg = Segment_2(border_edge->vertex()->point(), border_edge->opposite()->vertex()->point());
                 auto result = CGAL::intersection(line, border_seg);
                 Segment_2 split_seg;
+                Point_2 border_split_point;
                 if (result) {
                     if (const Point_2* p = boost::get<Point_2>(&*result)) {
                         split_seg = Segment_2(split_vertex->point(), *p);
                         this->split_segments.push_back(split_seg);
+                        border_split_point = *p;
                     }
                 }
                 else {  // if no intersection, connect with the cloest point in the border segment
@@ -283,6 +314,35 @@ namespace Partition
                     FT d2 = CGAL::squared_distance(p2, split_vertex->point());
                     const Point_2& p = (d1 < d2) ? p1 : p2;
                     split_seg = Segment_2(split_vertex->point(), p);
+                    border_split_point = p;
+                }
+                if (areTwoIntersectionPoints(poly, split_seg)) {    // safe to split
+                    Polygon_2 poly_left, poly_right;
+                    poly_left.push_back(border_split_point);
+                    Halfedge_handle cur_h = border_edge;
+                    int left_part_num = -1;
+                    Vertex_handle cur_v;
+                    do {
+                        cur_v = cur_h->vertex();
+                        poly_left.push_back(cur_v->point());
+                        if (v2pn[cur_v].size() == 1)
+                            left_part_num = *v2pn[cur_v].begin();
+                        cur_h = cur_h->next();
+                    } while (cur_v != split_vertex);
+                    int right_part_num = -1;
+                    poly_right.push_back(split_vertex->point());
+                    do {
+                        cur_v = cur_h->vertex();
+                        poly_right.push_back(cur_v->point());
+                        if (v2pn[cur_v].size() == 1)
+                            right_part_num = *v2pn[cur_v].begin();
+                        cur_h = cur_h->next();
+                    } while (cur_v != border_edge->opposite()->vertex());
+                    poly_right.push_back(border_split_point);
+                    if (left_part_num != -1 && poly_left.area() != 0)
+                        init_partition[left_part_num].push_back(poly_left);
+                    if (right_part_num != -1 && poly_right.area() != 0)
+                        init_partition[right_part_num].push_back(poly_right);
                 }
 				this->split_segments.push_back(split_seg);
             }
