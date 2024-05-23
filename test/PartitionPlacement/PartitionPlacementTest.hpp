@@ -96,6 +96,7 @@ namespace ParitionPlacement
 		const std::vector<Polygon_2>& skeleton_faces = ppSolver.get_skeleton_faces();
 		const std::vector<std::vector<Polygon_2>>& init_partition = ppSolver.get_init_partition();
 		const std::vector<Polygon_2>& uncertain_parts = ppSolver.get_uncertain_parts();
+        const std::vector<Segment_2>& split_segments = ppSolver.get_split_segments();
         std::vector<Polygon_2> PolyParts_outer, PolyParts_holes;
         PolyParts_outer.push_back(space.outer_boundary());
         PolyParts_holes.insert(PolyParts_holes.end(), space.holes_begin(), space.holes_end());
@@ -114,6 +115,7 @@ namespace ParitionPlacement
         CGAL::Color Segment_Color(50, 50, 50);
         CGAL::Color Skeleton_Color(0, 255, 0);
         CGAL::Color Centerline_Color(255, 255, 0);
+        CGAL::Color SplitSeg_Color(255, 0, 0);
 
         std::string title = "output-" + controlProps.InputFile;
         CGAL::CenterLineViewer<K> mainwindow(app.activeWindow(), *PolyParts_outer.begin(), title.c_str());
@@ -131,6 +133,7 @@ namespace ParitionPlacement
                 mainwindow.drawPartitions(part, Segment_Color, part_Color, Point_Color);
             }
 			mainwindow.drawPartitions(uncertain_parts, Segment_Color, Room_Color, Point_Color);
+            mainwindow.drawSegments(split_segments, SplitSeg_Color);
         }
         if (controlProps.withSimplifyBoundary) {
             CGAL::Color Simplify_Segment_Color(150, 150, 150);

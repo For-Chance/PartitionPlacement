@@ -9,6 +9,8 @@
 #include <CGAL/partition_2.h>
 #include <CGAL/Segment_2.h>
 #include <CGAL/Vector_2.h>
+#include <CGAL/Line_2.h>
+#include <CGAL/intersections.h>
 #include <CGAL/Straight_skeleton_builder_2.h>
 #include <list>
 #include <chrono>
@@ -34,6 +36,8 @@ namespace Partition
         using Point_2 = CGAL::Point_2<K>;
 		using Segment_2 = CGAL::Segment_2<K>;
         using Polygon_list = std::list<Polygon_2>;
+        using Vector_2 = CGAL::Vector_2<K>;
+        using Line_2 = CGAL::Line_2<K>;
         using Ss = CGAL::Straight_skeleton_2<K>;
         using Halfedge_iterator = typename Ss::Halfedge_iterator;
         using Halfedge_handle = typename Ss::Halfedge_handle;
@@ -77,6 +81,7 @@ namespace Partition
         std::vector<Polygon_2> skeleton_faces;
         std::vector<std::vector<Polygon_2>> init_partition;
         std::vector<Polygon_2> uncertain_parts;
+        std::vector<Segment_2> split_segments;
     };
 }
 
@@ -241,7 +246,47 @@ namespace Partition
 					uncertain_parts.push_back(get_poly_from_face(face));
                 }
 			}
-            std::cout << std::endl;
+
+            // spilit uncertain faces
+            for (Face_handle face : uncertain_faces) {
+                Halfedge_handle border_edge;
+                Vertex_handle split_vertex;
+                Halfedge_handle h = face->halfedge();
+                do {
+                    Vertex_handle v = h->vertex();
+                    if(connected_vertex.find(v) != connected_vertex.end())
+						split_vertex = v;
+                    if (!h->is_bisector()) {
+                        border_edge = h;
+                    }
+                    h = h->next();
+                } while (h != face->halfedge());
+                Halfedge_handle border_edge_next = border_edge->next();
+                Halfedge_handle border_edge_prev = border_edge->prev();
+                Vector_2 vec_next = Vector_2(border_edge_next->vertex()->point(), border_edge_next->opposite()->vertex()->point());
+                Vector_2 vec_prev = Vector_2(border_edge_prev->opposite()->vertex()->point(), border_edge_prev->vertex()->point());
+                Vector_2 vec_bisector = (vec_next + vec_prev) / 2;
+                Line_2 line(split_vertex->point(), vec_bisector);
+                Segment_2 border_seg = Segment_2(border_edge->vertex()->point(), border_edge->opposite()->vertex()->point());
+                auto result = CGAL::intersection(line, border_seg);
+                Segment_2 split_seg;
+                if (result) {
+                    if (const Point_2* p = boost::get<Point_2>(&*result)) {
+                        split_seg = Segment_2(split_vertex->point(), *p);
+                        this->split_segments.push_back(split_seg);
+                    }
+                }
+                else {  // if no intersection, connect with the cloest point in the border segment
+                    const Point_2& p1 = border_edge->vertex()->point();
+                    const Point_2& p2 = border_edge->opposite()->vertex()->point();
+                    FT d1 = CGAL::squared_distance(p1, split_vertex->point());
+                    FT d2 = CGAL::squared_distance(p2, split_vertex->point());
+                    const Point_2& p = (d1 < d2) ? p1 : p2;
+                    split_seg = Segment_2(split_vertex->point(), p);
+                }
+				this->split_segments.push_back(split_seg);
+            }
+            std::cout << "split_segments.size() = " << split_segments.size() << std::endl;
             std::cout << "partition done!" << std::endl;
         }
 		else
