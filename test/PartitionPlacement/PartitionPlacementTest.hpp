@@ -26,6 +26,8 @@ namespace ParitionPlacement
             std::string OutputFile;
             bool withSimplifyBoundary;
             bool showSkeletonFaces;
+            bool showCenterLines;
+            bool showPartitions;
         };
 
         PartitionPlacementTest(const std::string& config_file);
@@ -82,6 +84,8 @@ namespace ParitionPlacement
         controlProps.OutputFile = p["ControlProps"]["OutputFile"].asString();
 		controlProps.withSimplifyBoundary = p["ControlProps"]["withSimplifyBoundary"].asBool();
 		controlProps.showSkeletonFaces = p["ControlProps"]["showSkeletonFaces"].asBool();
+        controlProps.showCenterLines = p["ControlProps"]["showCenterLines"].asBool();
+        controlProps.showPartitions = p["ControlProps"]["showCenterLines"].asBool();
     }
 
     /// <summary>
@@ -123,17 +127,20 @@ namespace ParitionPlacement
         if (controlProps.showSkeletonFaces) {
             mainwindow.drawPartitions_withRandomColor(skeleton_faces);
         }
-        else {
-            /*mainwindow.drawPartitions(PolyParts_holes, Segment_Color, Holes_Color, Point_Color);
-            mainwindow.drawPartitions(PolyParts_outer, Segment_Color, Room_Color, Point_Color);
+        if (controlProps.showCenterLines) {
             mainwindow.drawSegments(skeleton_centerlines, Centerline_Color);
-            mainwindow.drawSegments(skeleton_otherlines, Skeleton_Color);*/
+            mainwindow.drawSegments(skeleton_otherlines, Skeleton_Color);
+        }
+        if (controlProps.showPartitions) {
+            /*mainwindow.drawPartitions(PolyParts_holes, Segment_Color, Holes_Color, Point_Color);
+            mainwindow.drawPartitions(PolyParts_outer, Segment_Color, Room_Color, Point_Color);*/
             for (auto part : init_partition) {
 				CGAL::Color part_Color(rand() % 255, rand() % 255, rand() % 255);
                 mainwindow.drawPartitions(part, Segment_Color, part_Color, Point_Color);
             }
 			mainwindow.drawPartitions(uncertain_parts, Segment_Color, Room_Color, Point_Color);
             mainwindow.drawSegments(split_segments, SplitSeg_Color);
+            
         }
         if (controlProps.withSimplifyBoundary) {
             CGAL::Color Simplify_Segment_Color(150, 150, 150);

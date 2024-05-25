@@ -264,9 +264,6 @@ namespace Partition
                                 intersection_points.push_back(*p);
                             }
                         }
-                        else if (const Segment_2* s = boost::get<Segment_2>(&*result)) {
-                            return false;
-                        }
                     }
 
                     if (intersection_points.size() > 2) {
@@ -276,6 +273,7 @@ namespace Partition
 
                 return intersection_points.size() == 2;
                 };
+            int clearup_num = 0;
             for (Face_handle face : uncertain_faces) {
                 Polygon_2 poly = get_Poly_from_Face(face);
                 Halfedge_handle border_edge;
@@ -343,10 +341,11 @@ namespace Partition
                         init_partition[left_part_num].push_back(poly_left);
                     if (right_part_num != -1 && poly_right.area() != 0)
                         init_partition[right_part_num].push_back(poly_right);
+                    clearup_num++;
                 }
 				this->split_segments.push_back(split_seg);
             }
-            std::cout << "split_segments.size() = " << split_segments.size() << std::endl;
+            std::cout << "split_segments.size() = " << split_segments.size() << ", uncertain part leaft: " << uncertain_faces.size() - clearup_num << std::endl;
             std::cout << "partition done!" << std::endl;
         }
 		else
