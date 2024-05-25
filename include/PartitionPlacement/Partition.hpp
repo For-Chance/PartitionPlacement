@@ -314,7 +314,6 @@ namespace Partition
                     split_seg = Segment_2(split_vertex->point(), p);
                     border_split_point = p;
                 }
-                if (areTwoIntersectionPoints(poly, split_seg)) {    // safe to split
                     Polygon_2 poly_left, poly_right;
                     poly_left.push_back(border_split_point);
                     Halfedge_handle cur_h = border_edge;
