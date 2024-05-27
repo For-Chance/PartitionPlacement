@@ -267,6 +267,8 @@ namespace Partition
                                 intersection_points.push_back(*p);
                             }
                         }
+                        else if (const Segment_2* seg = boost::get<Segment_2>(&*result))
+                            return false;
                     }
                     if (intersection_points.size() > 2) {
                         return false;
@@ -274,8 +276,10 @@ namespace Partition
                 }
                 return intersection_points.size() == 2;
                 };
+            int face_id = 0;
             for (Face_handle& face : uncertain_faces) {
                 Polygon_2 poly = get_Poly_from_Face(face);
+                std::cout << "uncertain_face_id = " << face_id++ << ", uncertain face size = " << poly.size();
                 Halfedge_handle border_edge;
                 struct VAttr {  // vertex attribute
                     FT dis_to_A = 0;
@@ -309,6 +313,7 @@ namespace Partition
                     }
                     h = h->next();
                 } while (h != face->halfedge());
+                std::cout << ", split_vertexs.size() = " << split_vertexs.size();
                 // cal A
                 Vertex_handle A = border_edge->vertex();
                 Halfedge_handle border_next_halfedge = border_edge->next();
@@ -350,10 +355,12 @@ namespace Partition
                 // sort according to choose num, B first, then A, then both not
                 std::vector<std::pair<Vertex_handle, VAttr>> split_vertexs_vec(split_vertexs.begin(), split_vertexs.end());
                 std::sort(split_vertexs_vec.begin(), split_vertexs_vec.end());
+                std::cout << ", chooseNum = ";
                 for (auto& sv : split_vertexs_vec) {
                     Vertex_handle& split_v = sv.first;
                     VAttr& attr = sv.second;
-                    std::cout << "chooseNum = " << attr.chooseNum << ", dis_to_A = " << attr.dis_to_A << ", dist_to_B = " << attr.dis_to_B << ", IsIntersect_to_A = " << attr.IsIntersect_to_A << ", IsIntersect_to_B = " << attr.IsIntersect_to_B << std::endl;
+                    std::cout << attr.chooseNum << " ";
+                    std::cout << "\tchooseNum = " << attr.chooseNum << ", dis_to_A = " << attr.dis_to_A << ", dist_to_B = " << attr.dis_to_B << ", IsIntersect_to_A = " << attr.IsIntersect_to_A << ", IsIntersect_to_B = " << attr.IsIntersect_to_B;
                     Polygon_2 poly_paint;
                     int part_num = -1;
                     if (attr.chooseNum == 1) {
@@ -387,10 +394,16 @@ namespace Partition
                     else {
                         continue;
                     }
+                    // 1. fix out the connect_vertex which degree is 2
+                    // 2. split in face_handle
+
                     // TODO: another part
-                    if (part_num != -1)
+                    if (part_num != -1) {
+                        std::cout << ", poly_paint area is " << poly_paint.area();
                         init_partition[part_num].push_back(poly_paint);
+                    }
                 }
+                std::cout << std::endl;
             }
             
             std::cout << "partition done!" << std::endl;
