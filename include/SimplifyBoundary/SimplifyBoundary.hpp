@@ -2,8 +2,9 @@
 #define SIMPLIFYBOUNDARY_HPP
 #include "GeoJSON.hpp"
 #include "stdafx.h"
+#include "convertKernel.hpp"
 
-#include <CGAL/Exact_predicates_exact_constructions_kernel.h> 
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h> 
 #include <CGAL/Polygon_with_holes_2.h>
 #include <CGAL/Polygon_2.h>
 #include <CGAL/Point_2.h>
@@ -88,6 +89,7 @@ namespace SimplifyBoundary {
     template <typename K>
     class Solver {
         using FT = typename K::FT;
+        using InexactK = CGAL::Exact_predicates_inexact_constructions_kernel;
         using Polygon_with_holes_2 = CGAL::Polygon_with_holes_2<K>;
         using Polygon_2 = CGAL::Polygon_2<K>;
         using Point_2 = CGAL::Point_2<K>;
@@ -161,8 +163,63 @@ namespace SimplifyBoundary {
             Polygon_with_holes_2 new_polygon(new_ob, new_holes.begin(), new_holes.end());
             return new_polygon;
         };
-        inline Polygon_with_holes_2 shrink_and_expand(const Polygon_with_holes_2& polygon, const ExpandProps& props);
-        inline Polygon_with_holes_2 shrink_and_expand2(const Polygon_with_holes_2& polygon, const ExpandProps& props);
+        inline Polygon_with_holes_2 shrink_and_expand(const Polygon_with_holes_2& polygon, const ExpandProps& props) {
+            if (props.offset <= 0) {
+                std::cout << "Warning!: offset is 0." << std::endl;
+                return polygon;
+            }
+
+            std::cout << "shrink_and_expand" << std::endl;
+            std::cout << "offset = " << props.offset << std::endl;
+            KernelConverter::KernelConverter<InexactK, K, KernelConverter::NumberConverter<InexactK::FT, FT>> Kconverter;
+            KernelConverter::KernelConverter<K, InexactK, KernelConverter::NumberConverter<FT, InexactK::FT>> InexactKconverter;
+            CGAL::Polygon_with_holes_2<InexactK> InputPolygon = InexactKconverter.convert(polygon);
+            double offset = CGAL::to_double(props.offset);
+
+#if CGAL_VERSION_MAJOR >= 5
+            std::cout << "CGAL version: 5.x" << std::endl;
+            auto in_offset_poly = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2<InexactK::FT, CGAL::Polygon_with_holes_2<InexactK>>(offset, InputPolygon);
+            auto ex_offset_poly = CGAL::create_exterior_skeleton_and_offset_polygons_with_holes_2<InexactK::FT, CGAL::Polygon_with_holes_2<InexactK>>(offset, *in_offset_poly[0]);
+            auto new_polygon = *ex_offset_poly[0];
+#else
+            std::cout << "CGAL version: 4.x" << std::endl;
+            std::vector<boost::shared_ptr<CGAL::Polygon_with_holes_2<InexactK>>> in_offset_poly = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2(props.offset, polygon);
+            const CGAL::Polygon_with_holes_2<InexactK>& in_Polygon = *in_offset_poly[0];
+            CGAL::Polygon_with_holes_2<InexactK> new_polygon = create_exterior_offset_polygons_with_holes_2(props.offset, in_Polygon);
+#endif
+
+            return Kconverter.convert(new_polygon);
+        }
+        // shrink->expand->shrink
+        inline Polygon_with_holes_2 shrink_and_expand2(const Polygon_with_holes_2& polygon, const ExpandProps& props) {
+            if (props.offset <= 0) {
+                std::cout << "Warning!: offset is 0." << std::endl;
+                return polygon;
+            }
+
+            std::cout << "shrink_and_expand2" << std::endl;
+            std::cout << "offset = " << props.offset << std::endl;
+            KernelConverter::KernelConverter<InexactK, K, KernelConverter::NumberConverter<InexactK::FT, FT>> Kconverter;
+            KernelConverter::KernelConverter<K, InexactK, KernelConverter::NumberConverter<FT, InexactK::FT>> InexactKconverter;
+            CGAL::Polygon_with_holes_2<InexactK> InputPolygon = InexactKconverter.convert(polygon);
+            double offset = CGAL::to_double(props.offset);
+
+            // cgal 4.14-3 don't support CGAL::create_exterior_skeleton_and_offset_polygons_with_holes_2 with parameter of Polygon_with_holes_2_2
+#if CGAL_VERSION_MAJOR >= 5
+            auto in_offset_poly = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2<InexactK::FT, CGAL::Polygon_with_holes_2<InexactK>>(offset, InputPolygon);
+            auto ex_offset_poly = CGAL::create_exterior_skeleton_and_offset_polygons_with_holes_2<InexactK::FT, CGAL::Polygon_with_holes_2<InexactK>>(offset * 2, *in_offset_poly[0]);
+            auto in_offset_poly2 = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2<InexactK::FT, CGAL::Polygon_with_holes_2<InexactK>>(offset, *ex_offset_poly[0]);
+            auto new_polygon = *in_offset_poly2[0];
+#else
+            std::vector<boost::shared_ptr<CGAL::Polygon_with_holes_2<InexactK>>> in_offset_poly = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2(props.offset, polygon);
+            const CGAL::Polygon_with_holes_2<InexactK>& in_Polygon = *in_offset_poly[0];
+            CGAL::Polygon_with_holes_2<InexactK> ex_offset_poly = create_exterior_offset_polygons_with_holes_2(props.offset * 2, in_Polygon);
+            std::vector<boost::shared_ptr<CGAL::Polygon_with_holes_2<InexactK>>> in_offset_poly2 = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2(props.offset, ex_offset_poly);
+            const CGAL::Polygon_with_holes_2<InexactK>& new_polygon = *in_offset_poly2[0];
+#endif
+            std::cout << "shrink and expand done" << std::endl;
+            return Kconverter.convert(new_polygon);
+        }
         inline Polygon_with_holes_2 tri_simplify(const Polygon_with_holes_2& polygon, const ExpandProps& props);
 
         struct pair_hash;
@@ -1449,62 +1506,6 @@ namespace SimplifyBoundary{
                 break;
             }
 		std::cout << "*****************************\tend simplify\t*****************************" << std::endl;
-        return new_polygon;
-    }
-
-    // shrink->expand
-    template <typename K>
-    inline CGAL::Polygon_with_holes_2<K> Solver<K>::shrink_and_expand(const Polygon_with_holes_2& polygon, const ExpandProps& props) {
-        if (props.offset <= 0) {
-            std::cout << "Warning!: offset is 0." << std::endl;
-            return polygon;
-        }
-
-        std::cout << "shrink_and_expand" << std::endl;
-        std::cout << "offset = " << props.offset << std::endl;
-        const Polygon_with_holes_2& new_polygon = polygon;
-#if CGAL_VERSION_MAJOR >= 5
-        // TODO
-        /*std::cout << "CGAL version: 5.x" << std::endl;
-        std::vector<boost::shared_ptr<Polygon_with_holes_2>> in_offset_poly = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2(props.offset, polygon);
-        std::vector<boost::shared_ptr<Polygon_with_holes_2>> ex_offset_poly = CGAL::create_exterior_skeleton_and_offset_polygons_with_holes_2(props.offset, *in_offset_poly[0]);
-        const Polygon_with_holes_2& new_polygon = *ex_offset_poly[0];*/
-#else
-        std::cout << "CGAL version: 4.x" << std::endl;
-        std::vector<boost::shared_ptr<Polygon_with_holes_2>> in_offset_poly = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2<FT, Polygon_with_holes_2, Polygon_with_holes_2>(props.offset, polygon);
-        const Polygon_with_holes_2& in_Polygon = *in_offset_poly[0];
-        Polygon_with_holes_2 new_polygon = create_exterior_offset_polygons_with_holes_2(props.offset, in_Polygon);
-#endif
-
-        return new_polygon;
-    }
-
-    // shrink->expand->shrink
-    template <typename K>
-    inline CGAL::Polygon_with_holes_2<K> Solver<K>::shrink_and_expand2(const Polygon_with_holes_2& polygon, const ExpandProps& props) {
-        if (props.offset <= 0) {
-            std::cout << "Warning!: offset is 0." << std::endl;
-            return polygon;
-        }
-
-        std::cout << "shrink_and_expand2" << std::endl;
-
-        std::cout << "offset = " << props.offset << std::endl;
-        const Polygon_with_holes_2& new_polygon = polygon;
-        // cgal 4.14-3 don't support CGAL::create_exterior_skeleton_and_offset_polygons_with_holes_2 with parameter of Poly_with_holes_2
-#if CGAL_VERSION_MAJOR >= 5
-        /*std::vector<boost::shared_ptr<Polygon_with_holes_2>> in_offset_poly = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2<FT, Polygon_with_holes_2, Polygon_with_holes_2>(props.offset, polygon);
-        std::vector<boost::shared_ptr<Polygon_with_holes_2>> ex_offset_poly = CGAL::create_exterior_skeleton_and_offset_polygons_with_holes_2<FT, Polygon_with_holes_2, Polygon_with_holes_2>(props.offset * 2, *in_offset_poly[0]);
-        std::vector<boost::shared_ptr<Polygon_with_holes_2>> in_offset_poly2 = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2<FT, Polygon_with_holes_2, Polygon_with_holes_2>(props.offset, *ex_offset_poly[0]);
-        const Polygon_with_holes_2& new_polygon = *in_offset_poly2[0];*/
-#else
-        std::vector<boost::shared_ptr<Polygon_with_holes_2>> in_offset_poly = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2<FT, Polygon_with_holes_2, Polygon_with_holes_2>(props.offset, polygon);
-        const Polygon_with_holes_2& in_Polygon = *in_offset_poly[0];
-        Polygon_with_holes_2 ex_offset_poly = create_exterior_offset_polygons_with_holes_2(props.offset * 2, in_Polygon);
-        std::vector<boost::shared_ptr<Polygon_with_holes_2>> in_offset_poly2 = CGAL::create_interior_skeleton_and_offset_polygons_with_holes_2<FT, Polygon_with_holes_2, Polygon_with_holes_2>(props.offset, ex_offset_poly);
-        const Polygon_with_holes_2& new_polygon = *in_offset_poly2[0];
-#endif
-        std::cout << "shrink and expand done" << std::endl;
         return new_polygon;
     }
 
