@@ -314,86 +314,78 @@ namespace Partition
 			this->init_partition = std::vector<std::vector<Polygon_2>>(parts.size());
 
             // 4.2 find certain faces and uncertain faces
-			std::vector<std::unordered_set<Face_handle>> certain_faces(parts.size());     // faces which are certain belong to which part
-			std::unordered_set<Face_handle> uncertain_faces;                       // faces which are uncertain belong to which part   
-            std::unordered_map<Face_handle, int> face2pn;                   // face 2 part num
-            for (Face_iterator it = this->skeleton->faces_begin(); it != this->skeleton->faces_end(); ++it) {
-				Face_handle face = it;
-                std::vector<Vertex_handle> centerline_vertex_in_face;
+            auto get_adj_faces = [&](const Face_handle& face) {
+                std::vector<Face_handle> adj_faces;
                 Halfedge_handle h = face->halfedge();
                 do {
-                    Vertex_handle v = h->vertex();
-                    if (centerline_vertex2cnt.find(v) != centerline_vertex2cnt.end())
-                        centerline_vertex_in_face.push_back(v);
+                    if (h->is_bisector())
+                        adj_faces.push_back(h->opposite()->face());
                     h = h->next();
                 } while (h != face->halfedge());
-                // all centerline is point to a center part
-                int part_num = -1;
-                for (auto v : centerline_vertex_in_face) {
-                    if (v2pn[v].size() == 1) {
-                        if(part_num == -1)
-						    part_num = *v2pn[v].begin();
-						else if (part_num != *v2pn[v].begin()) {
-							part_num = -1;
-							break;
-						}
-                    }
-                    else {
-                        part_num = -1;
+                return adj_faces;
+                };
+            std::vector<std::unordered_set<Face_handle>> certain_faces(parts.size());     // faces which are certain belong to which part
+            std::unordered_set<Face_handle> uncertain_faces;                       // faces which are uncertain belong to which part   
+            std::unordered_map<Face_handle, int> face2pn;                   // face 2 part num
+            std::unordered_map<Halfedge_handle, int> he2pn;                 // halfedge which is core he 2 part num
+            for (int i = 0; i < parts.size(); i++) {
+                const int& part_num = i;
+                const std::unordered_set<Vertex_handle>& part = parts[i];
+                for(auto& v : part) {
+					Halfedge_handle h = v->halfedge();
+					do {
+                        Vertex_handle from = h->opposite()->vertex(), to = h->vertex();
+						if(part.find(from) != part.end() && part.find(to) != part.end() && he2pn.find(h) == he2pn.end())
+                            he2pn[h] = part_num;
+						h = h->next()->opposite();
+					} while (h != v->halfedge());
+				}
+            }
+            for (auto it : he2pn) {
+                Halfedge_handle he = it.first;
+                int part_num = it.second;
+                std::queue<Face_handle> q;
+                Face_handle f = he->face();
+                if (face2pn.find(f) != face2pn.end())
+                    continue;
+                bool is_uncertain = false;
+                Halfedge_handle h = f->halfedge();
+                do {
+                    Vertex_handle v = h->vertex();
+                    if (connected_vertex.find(v) != connected_vertex.end()) {
+                        is_uncertain = true;
                         break;
                     }
+                    h = h->next();
+                } while (h != f->halfedge());
+                if (is_uncertain) {
+                    uncertain_faces.insert(f);
+					continue;
                 }
-                if (part_num != -1) {  // certain
-					certain_faces[part_num].insert(face);
-                    face2pn[face] = part_num;
-                    init_partition[part_num].push_back(get_Poly_from_Face(face));
-                }
-                else {  // uncertain
-                    uncertain_faces.insert(face);
-					uncertain_parts.push_back(get_Poly_from_Face(face));
-                }
-			}
-            
-
-            // 4.3 convert some uncertain faces which connect with no one connect vertex to certain faces
-            auto get_adj_faces = [&](const Face_handle& face) {
-				std::vector<Face_handle> adj_faces;
-				Halfedge_handle h = face->halfedge();
-				do {
-                    if(h->is_bisector())
-					    adj_faces.push_back(h->opposite()->face());
-					h = h->next();
-				} while (h != face->halfedge());
-				return adj_faces;
-				};
-            std::vector<Face_handle> convert_faces;
-            for (Face_handle face : uncertain_faces) {
-                int centerline_vertex_cnt = 0;
-				Halfedge_handle h = face->halfedge();
-				do {
-					Vertex_handle v = h->vertex();
-					if (centerline_vertex2cnt.find(v) != centerline_vertex2cnt.end())
-                        centerline_vertex_cnt++;
-					h = h->next();
-				} while (h != face->halfedge());
-				int part_num = -1;
-                if (centerline_vertex_cnt == 0) {
-                    for(auto& adj_face : get_adj_faces(face)) {
-						if (face2pn.find(adj_face) != face2pn.end()) {
-							part_num = face2pn[adj_face];
-							break;
-						}
+                q.push(f);
+                while(!q.empty()) {
+                    Face_handle cur_face = q.front();
+                    q.pop();
+                    certain_faces[part_num].insert(cur_face);
+                    face2pn[cur_face] = part_num;
+                    init_partition[part_num].push_back(get_Poly_from_Face(cur_face));
+                    std::vector<Face_handle>& adj_faces = get_adj_faces(cur_face);
+                    for(auto& adj_face : adj_faces) {
+                        bool is_same_part = true;
+						Halfedge_handle h = adj_face->halfedge();
+                        do {
+                            Vertex_handle v = h->vertex();
+                            if (connected_vertex.find(v) != connected_vertex.end()) {
+                                is_same_part = false;
+                                break;
+                            }
+                            h = h->next();
+                        } while (h != adj_face->halfedge());
+                        if(is_same_part && face2pn.find(adj_face) == face2pn.end())
+							q.push(adj_face);
 					}
-                    if (part_num != -1) {
-                        certain_faces[part_num].insert(face);
-                        face2pn[face] = part_num;
-                        init_partition[part_num].push_back(get_Poly_from_Face(face));
-                        convert_faces.push_back(face);
-                    }
                 }
-			}
-            for (auto face : convert_faces)
-				uncertain_faces.erase(face);
+            }
 
             // spilit uncertain faces
             auto areTwoIntersectionPointsInside = [](const Polygon_2& polygon, const Segment_2& segment) {
