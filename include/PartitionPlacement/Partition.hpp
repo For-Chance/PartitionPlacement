@@ -22,6 +22,9 @@
 
 namespace Partition
 {
+    const double eps = 1. / (1 << 20), eps2 = eps * eps,
+        eps_limit = 0.25 / (1ll << 62);
+
     template <typename K>
     struct PartitionProps {
         bool withSimplifyBoundary;
@@ -76,6 +79,10 @@ namespace Partition
                 return p1.x() == p2.x() && p1.y() == p2.y();
             }
         };
+        static bool equal(const FT& a, const FT& b, FT epsilon = eps)
+        {
+            return a + epsilon > b && a < b + epsilon;
+        }
         /// <summary>
 		/// build skeleton of a Polygon_with_holes_2
         /// </summary>
@@ -146,7 +153,7 @@ namespace Partition
             }
             
 			std::cout << "partition..." << std::endl;
-            // 3. partition
+            // 3. find centerline
             // 3.1 save to skeleton_faces
             for (Face_iterator it = this->skeleton->faces_begin(); it != this->skeleton->faces_end(); ++it) {
                 Face_handle face = it;
@@ -155,6 +162,10 @@ namespace Partition
             // 3.2 find center line
             // first we try to make skeleton of no connect boundary is center line
             std::unordered_map<Vertex_handle, int> centerline_vertex2cnt;
+            std::unordered_set<Vertex_handle> stop_vertices;
+            double THRE_THETA = 150;
+            FT MIN_SQUARED_COS_THETA = std::cos(THRE_THETA * M_PI / 180);
+            MIN_SQUARED_COS_THETA *= MIN_SQUARED_COS_THETA;
             for (Halfedge_iterator it = this->skeleton->halfedges_begin(); it != this->skeleton->halfedges_end(); ++it) {
                 if (it->is_bisector()) {    // the halfedge is not border
                     Vertex_handle from = it->opposite()->vertex(), to = it->vertex();
@@ -168,44 +179,107 @@ namespace Partition
                             swap(from, to);
                             swap(l, r);
                         }
-                        int la = l->vertex()->id();
+                        /*int la = l->vertex()->id();
                         int lb = l->opposite()->vertex()->id();
                         int ra = r->vertex()->id();
                         int rb = r->opposite()->vertex()->id();
                         if (la == ra || la == rb || lb == ra || lb == rb) {
 							this->skeleton_otherlines.push_back(Segment_2(from->point(), to->point()));
-                        }
-                        else {  // centerline
-							this->skeleton_centerlines.push_back(Segment_2(from->point(), to->point()));
+                        }*/
+                        Point_2 v_la = l->vertex()->point();
+                        Point_2 v_lb = l->opposite()->vertex()->point();
+                        Vector_2 v_l = v_la - v_lb;
+                        Point_2 v_ra = r->vertex()->point();
+                        Point_2 v_rb = r->opposite()->vertex()->point();
+                        Vector_2 v_r = v_ra - v_rb;
+                        FT inner = v_l.x() * v_r.x() + v_l.y() * v_r.y();
+                        FT outer = v_l.x() * v_r.y() - v_l.y() * v_r.x();
+                        FT absolute_scale = v_l.squared_length() * v_r.squared_length();
+                        FT squared_cos_theta = (inner * inner) / absolute_scale;
+                        bool is_ans = !(equal(v_la.x(), v_rb.x()) && equal(v_la.y(), v_rb.y()) && squared_cos_theta >= MIN_SQUARED_COS_THETA && inner >= 0);
+                        if(is_ans)
+                        {  // centerline candidate
                             centerline_vertex2cnt[from] += 1;
-							centerline_vertex2cnt[to] += 1;
+                            centerline_vertex2cnt[to] += 1;
+                            bool is_stop = inner < 0 && squared_cos_theta >= MIN_SQUARED_COS_THETA;
+                            if(is_stop) {
+                                stop_vertices.insert(from);
+                                stop_vertices.insert(to);
+							}
                         }
                     }
                 }
             }
 			
-            // find connected vertex and leaf vertex
-            std::unordered_set<Vertex_handle> connected_vertex;
-            std::unordered_set<Vertex_handle> leaf_vertex;
-            for (auto it : centerline_vertex2cnt)
-                if (it.second >= 3)
-                    connected_vertex.insert(it.first);
-                else if (it.second == 1)
-                    leaf_vertex.insert(it.first);
-			std::cout << "connected_vertex.size() = " << connected_vertex.size() << ", leaf_vertex.size() = " << leaf_vertex.size() << std::endl;
-
-            // init partition
-			auto get_adj_centerline_vertex = [&](Vertex_handle v) {
-				std::vector<Vertex_handle> adj_vertex;
-				Halfedge_handle h = v->halfedge();
+            // 3.3 find connected vertex and leaf vertex
+            auto get_adj_centerline_vertex = [&](Vertex_handle v) {
+                std::vector<Vertex_handle> adj_vertex;
+                Halfedge_handle h = v->halfedge();
                 do {
+                    Vertex_handle adj = h->opposite()->vertex();
+                    if (centerline_vertex2cnt.find(adj) != centerline_vertex2cnt.end())
+                        adj_vertex.push_back(adj);
+                    h = h->next()->opposite();
+                } while (h != v->halfedge());
+                return adj_vertex;
+                };
+            auto get_adj_latest_vertex = [&](Vertex_handle v) {
+				Vertex_handle latest_vertex = v;
+                auto latest_time = v->time();
+                std::cout << latest_time << " ";
+				Halfedge_handle h = v->halfedge();
+				do {
 					Vertex_handle adj = h->opposite()->vertex();
-					if (centerline_vertex2cnt.find(adj) != centerline_vertex2cnt.end())
-						adj_vertex.push_back(adj);
+                    if (centerline_vertex2cnt.find(adj) != centerline_vertex2cnt.end())
+					    if(adj->time() > latest_time) {
+						    latest_time = adj->time();
+						    latest_vertex = adj;
+                            std::cout << latest_time << " ";
+					    }
 					h = h->next()->opposite();
 				} while (h != v->halfedge());
-				return adj_vertex;
-			};
+                std::cout << std::endl;
+				return latest_vertex;
+				};
+            std::unordered_set<Vertex_handle> leaf_vertex;
+            for (auto it : centerline_vertex2cnt)
+                if (it.second == 1)
+                    leaf_vertex.insert(it.first);
+            for (auto it : leaf_vertex) {
+                Vertex_handle cur_v = it;
+                do {
+                    Vertex_handle adj_vertex = get_adj_latest_vertex(cur_v);
+                    if (adj_vertex == cur_v)
+						break;
+                    centerline_vertex2cnt.erase(cur_v);
+                    cur_v = adj_vertex;
+                } while (stop_vertices.find(cur_v) == stop_vertices.end());
+            }
+            std::unordered_set<Vertex_handle> connected_vertex;
+            for(auto& it : centerline_vertex2cnt)
+				it.second = get_adj_centerline_vertex(it.first).size();
+            leaf_vertex.clear();
+			for (auto& it : centerline_vertex2cnt)
+				if (it.second == 1)
+                    leaf_vertex.insert(it.first);
+                else if (it.second == 3)
+					connected_vertex.insert(it.first);
+            for (Halfedge_iterator it = this->skeleton->halfedges_begin(); it != this->skeleton->halfedges_end(); ++it) {
+                if (it->is_bisector()) {    // the halfedge is not border
+                    Vertex_handle from = it->opposite()->vertex(), to = it->vertex();
+                    if (from->id() < to->id()) {
+                        if (from->time() > to->time())
+                            swap(from, to);
+                        if (centerline_vertex2cnt.find(from) != centerline_vertex2cnt.end() && centerline_vertex2cnt.find(to) != centerline_vertex2cnt.end())   // centerline
+                            this->skeleton_centerlines.push_back(Segment_2(from->point(), to->point()));
+                        else
+                            this->skeleton_otherlines.push_back(Segment_2(from->point(), to->point()));
+                    }
+                }
+            }
+
+            // 4. partition
+            // init partition
             std::vector<std::unordered_set<Vertex_handle>> parts;
             std::unordered_set<Vertex_handle> visited; 
             for (Vertex_handle it : connected_vertex) {
