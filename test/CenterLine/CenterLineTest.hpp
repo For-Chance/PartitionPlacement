@@ -121,7 +121,7 @@ namespace CenterLine {
 			const char* argv[2] = { "t2_viewer","\0" };
 			QApplication app(argc, const_cast<char**>(argv));
 			std::string title = "output-" + controlProps.InputFile;
-			CGAL::CenterLineViewer<Polygon_2> mainwindow(app.activeWindow(), *PolyParts.begin(), title.c_str());
+			CGAL::CenterLineViewer<K> mainwindow(app.activeWindow(), *PolyParts.begin(), title.c_str());
 			mainwindow.drawPartitions(PolyParts, CGAL::Color(0, 0, 0), CGAL::Color(67, 177, 235));
 			mainwindow.drawTree(points, segs, CGAL::Color(255, 255, 0));	// centerline
 			mainwindow.drawTree(points, new_segs, CGAL::Color(255, 0, 0));	// connect line of centerline
@@ -158,7 +158,7 @@ namespace CenterLine {
 			const char* argv[2] = { "t2_viewer","\0" };
 			QApplication app(argc, const_cast<char**>(argv));
 			std::string title = "output-" + controlProps.InputFile;
-			CGAL::CenterLineViewer<Polygon_2> mainwindow(app.activeWindow(), *PolyParts.begin(), title.c_str());
+			CGAL::CenterLineViewer<K> mainwindow(app.activeWindow(), *PolyParts.begin(), title.c_str());
 			mainwindow.drawPartitions(PolyParts, CGAL::Color(0, 0, 0), CGAL::Color(67, 177, 235));
 			mainwindow.drawTree(points, segs, CGAL::Color(255, 255, 0));	// centerline
 			mainwindow.show();
