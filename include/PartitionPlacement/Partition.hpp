@@ -279,7 +279,7 @@ namespace Partition
             }
 
             // 4. partition
-            // init partition
+            // 4.1 init partition according to connected vertex
             std::vector<std::unordered_set<Vertex_handle>> parts;
             std::unordered_set<Vertex_handle> visited; 
             for (Vertex_handle it : connected_vertex) {
@@ -307,15 +307,16 @@ namespace Partition
             for (auto p : parts)
                 std::cout << p.size() << " ";
             std::cout << std::endl;
-            
             std::unordered_map < Vertex_handle, std::unordered_set<int>> v2pn;  // vertex 2 part num
-            for (int part_num = 0; part_num < parts.size(); ++part_num) {
+            for (int part_num = 0; part_num < parts.size(); ++part_num)
                 for (auto v : parts[part_num])
                     v2pn[v].insert(part_num);
-            }
 			this->init_partition = std::vector<std::vector<Polygon_2>>(parts.size());
+
+            // 4.2 find certain faces and uncertain faces
 			std::vector<std::unordered_set<Face_handle>> certain_faces(parts.size());     // faces which are certain belong to which part
-			std::vector<Face_handle> uncertain_faces;                       // faces which are uncertain belong to which part   
+			std::unordered_set<Face_handle> uncertain_faces;                       // faces which are uncertain belong to which part   
+            std::unordered_map<Face_handle, int> face2pn;                   // face 2 part num
             for (Face_iterator it = this->skeleton->faces_begin(); it != this->skeleton->faces_end(); ++it) {
 				Face_handle face = it;
                 std::vector<Vertex_handle> centerline_vertex_in_face;
@@ -344,13 +345,55 @@ namespace Partition
                 }
                 if (part_num != -1) {  // certain
 					certain_faces[part_num].insert(face);
+                    face2pn[face] = part_num;
                     init_partition[part_num].push_back(get_Poly_from_Face(face));
                 }
                 else {  // uncertain
-                    uncertain_faces.push_back(face);
+                    uncertain_faces.insert(face);
 					uncertain_parts.push_back(get_Poly_from_Face(face));
                 }
 			}
+            
+
+            // 4.3 convert some uncertain faces which connect with no one connect vertex to certain faces
+            auto get_adj_faces = [&](const Face_handle& face) {
+				std::vector<Face_handle> adj_faces;
+				Halfedge_handle h = face->halfedge();
+				do {
+                    if(h->is_bisector())
+					    adj_faces.push_back(h->opposite()->face());
+					h = h->next();
+				} while (h != face->halfedge());
+				return adj_faces;
+				};
+            std::vector<Face_handle> convert_faces;
+            for (Face_handle face : uncertain_faces) {
+                int centerline_vertex_cnt = 0;
+				Halfedge_handle h = face->halfedge();
+				do {
+					Vertex_handle v = h->vertex();
+					if (centerline_vertex2cnt.find(v) != centerline_vertex2cnt.end())
+                        centerline_vertex_cnt++;
+					h = h->next();
+				} while (h != face->halfedge());
+				int part_num = -1;
+                if (centerline_vertex_cnt == 0) {
+                    for(auto& adj_face : get_adj_faces(face)) {
+						if (face2pn.find(adj_face) != face2pn.end()) {
+							part_num = face2pn[adj_face];
+							break;
+						}
+					}
+                    if (part_num != -1) {
+                        certain_faces[part_num].insert(face);
+                        face2pn[face] = part_num;
+                        init_partition[part_num].push_back(get_Poly_from_Face(face));
+                        convert_faces.push_back(face);
+                    }
+                }
+			}
+            for (auto face : convert_faces)
+				uncertain_faces.erase(face);
 
             // spilit uncertain faces
             auto areTwoIntersectionPointsInside = [](const Polygon_2& polygon, const Segment_2& segment) {
@@ -381,7 +424,7 @@ namespace Partition
                 std::vector<Polygon_2> split_polys;
             };
             std::unordered_map<Face_handle, SplitPolyVector> face2split_polys;   // split a face to several parts
-            for (Face_handle& face : uncertain_faces) {
+            for (Face_handle face : uncertain_faces) {
                 Polygon_2 poly = get_Poly_from_Face(face);
                 std::cout << "uncertain_face_id = " << face_id++ << ", uncertain face size = " << poly.size();
                 Halfedge_handle border_edge;
