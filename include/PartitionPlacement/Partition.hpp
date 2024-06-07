@@ -388,11 +388,8 @@ namespace Partition
             }
 
             // spilit uncertain faces
-            auto areTwoIntersectionPointsInside = [](const Polygon_2& polygon, const Segment_2& segment) {
+            auto areTwoIntersectionPoints = [](const Polygon_2& polygon, const Segment_2& segment) {
                 std::vector<Point_2> intersection_points;
-                Point_2 mid_point = segment.source() + (segment.target() - segment.source()) / 2;
-                if (!(polygon.bounded_side(mid_point) == CGAL::ON_BOUNDED_SIDE))
-                    return false;
 
                 for (auto edge = polygon.edges_begin(); edge != polygon.edges_end(); ++edge) {
                     auto result = CGAL::intersection(*edge, segment);
@@ -402,177 +399,88 @@ namespace Partition
                                 intersection_points.push_back(*p);
                             }
                         }
-                        else if (const Segment_2* seg = boost::get<Segment_2>(&*result))
+                        else if (const Segment_2* s = boost::get<Segment_2>(&*result)) {
                             return false;
+                        }
                     }
+
                     if (intersection_points.size() > 2) {
                         return false;
                     }
                 }
+
                 return intersection_points.size() == 2;
                 };
-            int face_id = 0;
-            struct SplitPolyVector {
-                std::vector<Polygon_2> split_polys;
-            };
-            std::unordered_map<Face_handle, SplitPolyVector> face2split_polys;   // split a face to several parts
             for (Face_handle face : uncertain_faces) {
                 Polygon_2 poly = get_Poly_from_Face(face);
-                std::cout << "uncertain_face_id = " << face_id++ << ", uncertain face size = " << poly.size();
                 Halfedge_handle border_edge;
-                struct VAttr {  // vertex attribute
-                    FT dis_to_A = 0;
-                    FT dis_to_B = 0;
-                    bool IsIntersect_to_A = false;
-                    bool IsIntersect_to_B = false;
-                    int ChooseNum() {   // 0: both not, 1: A, 2: B
-                        if (IsIntersect_to_A == true && IsIntersect_to_B == true)
-                            return 0;
-                        else if (IsIntersect_to_B == true)
-                            return 1;
-                        else if (IsIntersect_to_A == true)
-                            return 2;
-                        else
-                            return dis_to_A < dis_to_B ? 1 : 2;
-                    }
-                    int chooseNum;
-                    Halfedge_handle A, B;
-                    bool operator<(const VAttr& other) const {
-						return chooseNum != chooseNum ? chooseNum > other.chooseNum : CGAL::max(dis_to_A, dis_to_B) < CGAL::max(other.dis_to_A, other.dis_to_B); // 2-
-					}
-                };
-                std::unordered_map<Halfedge_handle, VAttr> split_hes;
+                Vertex_handle split_vertex;
                 Halfedge_handle h = face->halfedge();
                 do {
                     Vertex_handle v = h->vertex();
                     if (connected_vertex.find(v) != connected_vertex.end())
-                        split_hes[h] = VAttr();
+                        split_vertex = v;
                     if (!h->is_bisector()) {
                         border_edge = h;
                     }
                     h = h->next();
                 } while (h != face->halfedge());
-                std::cout << ", split_hes.size() = " << split_hes.size();
-                // cal A
-                Halfedge_handle A = border_edge;
-                Halfedge_handle border_next_halfedge = border_edge->next();
-                h = border_next_halfedge;
-                FT dis = 0;
-                while (h != border_edge) {
-                    Vertex_handle v = h->vertex();
-                    dis += CGAL::approximate_sqrt(CGAL::squared_distance(v->point(), h->prev()->vertex()->point()));
-                    if (split_hes.find(h) != split_hes.end()) {
-                        split_hes[h].dis_to_A = dis;
-                        Segment_2 seg(v->point(), A->vertex()->point());
-                        split_hes[h].IsIntersect_to_A = !areTwoIntersectionPointsInside(poly, seg);
+                Halfedge_handle border_edge_next = border_edge->next();
+                Halfedge_handle border_edge_prev = border_edge->prev();
+                Vector_2 vec_next = Vector_2(border_edge_next->vertex()->point(), border_edge_next->opposite()->vertex()->point());
+                Vector_2 vec_prev = Vector_2(border_edge_prev->opposite()->vertex()->point(), border_edge_prev->vertex()->point());
+                Vector_2 vec_bisector = (vec_next + vec_prev) / 2;
+                Line_2 line(split_vertex->point(), vec_bisector);
+                Segment_2 border_seg = Segment_2(border_edge->vertex()->point(), border_edge->opposite()->vertex()->point());
+                auto result = CGAL::intersection(line, border_seg);
+                Segment_2 split_seg;
+                Point_2 border_split_point;
+                if (result) {
+                    if (const Point_2* p = boost::get<Point_2>(&*result)) {
+                        split_seg = Segment_2(split_vertex->point(), *p);
+                        this->split_segments.push_back(split_seg);
+                        border_split_point = *p;
                     }
-                    h = h->next();
-                };
-                // cal B
-                Halfedge_handle B = border_edge->prev();
-                Halfedge_handle border_prev_halfedge = border_edge->prev();
-                h = border_prev_halfedge;
-                dis = 0;
-                while (h != border_edge) {
-                    Vertex_handle v = h->prev()->vertex();
-                    dis += CGAL::approximate_sqrt(CGAL::squared_distance(v->point(), h->vertex()->point()));
-                    if (split_hes.find(h) != split_hes.end()) {
-                        split_hes[h].dis_to_B = dis;
-                        Segment_2 seg(v->point(), B->vertex()->point());
-                        split_hes[h].IsIntersect_to_B = !areTwoIntersectionPointsInside(poly, seg);
-                    }
-                    h = h->prev();
-                };
-                // get choose num
-                for (auto& it : split_hes) {
-                    it.second.chooseNum = it.second.ChooseNum();
-                    if (it.second.chooseNum == 1)
-                        it.second.A = A;
-                    else if (it.second.chooseNum == 2)
-                        it.second.B = B;
                 }
-                // sort according to choose num, B first, then A, then both not
-                std::vector<std::pair<Halfedge_handle, VAttr>> split_hes_vec(split_hes.begin(), split_hes.end());
-                std::sort(split_hes_vec.begin(), split_hes_vec.end(), [](const std::pair<Halfedge_handle, VAttr>& a, std::pair<Halfedge_handle, VAttr>& b) {return a.second < b.second; });
-                std::cout << ", chooseNum = ";
-
-                std::vector<std::pair<Halfedge_handle, Halfedge_handle>> seg_hes;
-                for (auto& sv : split_hes_vec) {
-                    Halfedge_handle& split_he = sv.first;
-                    VAttr& attr = sv.second;
-                    std::cout << attr.chooseNum << " ";
-                    std::cout << "\tchooseNum = " << attr.chooseNum << ", dis_to_A = " << attr.dis_to_A << ", dist_to_B = " << attr.dis_to_B << ", IsIntersect_to_A = " << attr.IsIntersect_to_A << ", IsIntersect_to_B = " << attr.IsIntersect_to_B;
-                    Polygon_2 poly_paint;
-                    int part_num = -1;
-                    if (attr.chooseNum == 1) {
-                        Halfedge_handle A = attr.A;
-                        seg_hes.emplace_back(split_he, A);
-                        /*Halfedge_handle cur_h = A->halfedge();
-                        Vertex_handle cur_v;
-                        do {
-                            cur_v = cur_h->vertex();
-                            if (v2pn[cur_v].size() == 1)
-                                part_num = *v2pn[cur_v].begin();
-                            poly_paint.push_back(cur_v->point());
-                            cur_h = cur_h->next();
-                        } while (cur_v != split_v);*/
-                    }
-                    else if (attr.chooseNum == 2) {
-                        Halfedge_handle B = attr.B;
-                        seg_hes.emplace_back(split_he, B);
-                        /*Halfedge_handle cur_h = border_edge;
-                        Vertex_handle cur_v;
-                        do {
-                            cur_v = cur_h->prev()->vertex();
-                            cur_h = cur_h->prev();
-                        } while (cur_v != split_v);
-                        do {
-                            cur_v = cur_h->vertex();
-                            if (v2pn[cur_v].size() == 1) {
-                                part_num = *v2pn[cur_v].begin();
-                            }
-                            poly_paint.push_back(cur_v->point());
-                            cur_h = cur_h->next();
-                        } while (cur_v != border_edge->prev()->vertex());*/
-                    }
-                    else {
-                        continue;
-                    }
-                    // 1. fix out the connect_vertex which degree is 2
-                    // 2. split in face_handle
+                else {  // if no intersection, connect with the cloest point in the border segment
+                    const Point_2& p1 = border_edge->vertex()->point();
+                    const Point_2& p2 = border_edge->opposite()->vertex()->point();
+                    FT d1 = CGAL::squared_distance(p1, split_vertex->point());
+                    FT d2 = CGAL::squared_distance(p2, split_vertex->point());
+                    const Point_2& p = (d1 < d2) ? p1 : p2;
+                    split_seg = Segment_2(split_vertex->point(), p);
+                    border_split_point = p;
                 }
-                
-                auto split_polygon = [&](const Face_handle& f, const std::vector<std::pair<Halfedge_handle, Halfedge_handle>>& seg_hes) {
-                    if (seg_hes.empty()) return std::vector<std::pair<Polygon_2, int>>();
-
-                    Decorator decorator(*skeleton);
-                    
-                    std::vector<Halfedge_handle> split_hes;
-                    for (auto& hes : seg_hes)
-                        split_hes.push_back(decorator.split_face(hes.first, hes.second));
-                    
-                    std::unordered_map<int, std::unordered_set<Halfedge_handle>> p2hes;
-                    for (auto& hes : seg_hes) {
-                        Halfedge_handle split_he = hes.first;
-                        const std::unordered_set<int>& part_nums = v2pn[split_he->vertex()];
-                        for(auto& pn : part_nums)
-							p2hes[pn].insert(split_he);
-                    }
-                    std::vector<std::pair<Polygon_2, int>> split_polygons;
-                    std::cout << " split to " << split_polygons.size() << " parts";
-
-                    return split_polygons;
-                    };
-
-                std::vector<std::pair<Polygon_2, int>> split_polygons = split_polygon(face, seg_hes);
-                for (auto& split_poly : split_polygons) {
-                    int part_num = split_poly.second;
-                    if (part_num != -1)
-                        init_partition[part_num].push_back(split_poly.first);
+                if (areTwoIntersectionPoints(poly, split_seg)) {    // safe to split
+                    Polygon_2 poly_left, poly_right;
+                    poly_left.push_back(border_split_point);
+                    Halfedge_handle cur_h = border_edge;
+                    int left_part_num = -1;
+                    Vertex_handle cur_v;
+                    do {
+                        cur_v = cur_h->vertex();
+                        poly_left.push_back(cur_v->point());
+                        if (v2pn[cur_v].size() == 1)
+                            left_part_num = *v2pn[cur_v].begin();
+                        cur_h = cur_h->next();
+                    } while (cur_v != split_vertex);
+                    int right_part_num = -1;
+                    poly_right.push_back(split_vertex->point());
+                    do {
+                        cur_v = cur_h->vertex();
+                        poly_right.push_back(cur_v->point());
+                        if (v2pn[cur_v].size() == 1)
+                            right_part_num = *v2pn[cur_v].begin();
+                        cur_h = cur_h->next();
+                    } while (cur_v != border_edge->opposite()->vertex());
+                    poly_right.push_back(border_split_point);
+                    if (left_part_num != -1 && poly_left.area() != 0)
+                        init_partition[left_part_num].push_back(poly_left);
+                    if (right_part_num != -1 && poly_right.area() != 0)
+                        init_partition[right_part_num].push_back(poly_right);
                 }
-                std::cout << std::endl;
+                this->split_segments.push_back(split_seg);
             }
-            
             std::cout << "partition done!" << std::endl;
         }
 		else
