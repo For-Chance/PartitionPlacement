@@ -32,6 +32,7 @@ namespace ParitionPlacement
 		std::vector<std::vector<Polygon_2>> get_init_partition() const{ return PartitionSolver.init_partition; }
 		std::vector<Polygon_2> get_uncertain_parts() const { return PartitionSolver.uncertain_parts; }
         std::vector<Segment_2> get_split_segments() const {return PartitionSolver.split_segments; }
+        std::vector<Point_2> get_log_points() const { return PartitionSolver.log_points; }
     private:
         Partition::Solver<K> PartitionSolver;
         Placement::Solver<K> PlacementSolver;

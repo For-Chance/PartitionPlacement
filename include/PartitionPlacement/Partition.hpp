@@ -131,6 +131,7 @@ namespace Partition
         std::vector<std::vector<Polygon_2>> init_partition;
         std::vector<Polygon_2> uncertain_parts;
         std::vector<Segment_2> split_segments;
+        std::vector<Point_2> log_points;
     };
 }
 
@@ -163,6 +164,7 @@ namespace Partition
             // first we try to make skeleton of no connect boundary is center line
             std::unordered_map<Vertex_handle, int> centerline_vertex2cnt;
             std::unordered_set<Vertex_handle> stop_vertices;
+            std::vector<std::pair<Vertex_handle, bool>> he_pool;   // from_vertex 2 is_ans ; use a vector to control the loop sequence so that there is always same result
             double THRE_THETA = 150;
             FT MIN_SQUARED_COS_THETA = std::cos(THRE_THETA * M_PI / 180);
             MIN_SQUARED_COS_THETA *= MIN_SQUARED_COS_THETA;
@@ -207,6 +209,7 @@ namespace Partition
                                 stop_vertices.insert(to);
 							}
                         }
+                        he_pool.push_back(std::make_pair(from, is_ans));
                     }
                 }
             }
@@ -217,11 +220,15 @@ namespace Partition
                 Halfedge_handle h = v->halfedge();
                 do {
                     Vertex_handle adj = h->opposite()->vertex();
-                    if (centerline_vertex2cnt.find(adj) != centerline_vertex2cnt.end())
+                    if (h->is_bisector() && centerline_vertex2cnt.find(adj) != centerline_vertex2cnt.end()) {
                         adj_vertex.push_back(adj);
+                    }
                     h = h->next()->opposite();
                 } while (h != v->halfedge());
                 return adj_vertex;
+                };
+            auto get_ans_num = [&](Vertex_handle v) {
+                return get_adj_centerline_vertex(v).size();
                 };
             auto get_next_ans_vertex = [&](Vertex_handle v, bool& delete_v) {
                 std::vector<Vertex_handle>& adj_vertices = get_adj_centerline_vertex(v);
@@ -231,18 +238,22 @@ namespace Partition
                 }
                 return adj_vertices[0];
                 };
-
-            std::unordered_set<Vertex_handle> leaf_vertex;
-            for (auto it : centerline_vertex2cnt)
-                if (it.second == 1)
-                    leaf_vertex.insert(it.first);
-            for (auto it : leaf_vertex) {
-                Vertex_handle cur_v = it;
+            std::vector<Vertex_handle> leaf_vertex;
+            for (std::pair<Vertex_handle, bool>& it : he_pool)
+                if(it.second == true)   // is centerline candidate
+                    if(centerline_vertex2cnt[it.first] == 1)
+                        leaf_vertex.push_back(it.first);
+            for (int idx = 0; idx < leaf_vertex.size();idx++) {
+                Vertex_handle& cur_v = leaf_vertex[idx];
+                log_points.push_back(cur_v->point());
                 bool delete_v = true;
-                while (delete_v && stop_vertices.find(cur_v) == stop_vertices.end()) {
+                do {
+                    Vertex_handle next_v = get_next_ans_vertex(cur_v, delete_v);
+                    if (!delete_v)
+                        break;
                     centerline_vertex2cnt.erase(cur_v);
-                    cur_v = get_next_ans_vertex(cur_v, delete_v);
-                }
+                    cur_v = next_v;
+                }while(stop_vertices.find(cur_v) == stop_vertices.end());
             }
             std::unordered_set<Vertex_handle> connected_vertex;
             for(auto& it : centerline_vertex2cnt)
@@ -250,7 +261,7 @@ namespace Partition
             leaf_vertex.clear();
 			for (auto& it : centerline_vertex2cnt)
 				if (it.second == 1)
-                    leaf_vertex.insert(it.first);
+                    leaf_vertex.push_back(it.first);
                 else if (it.second == 3)
 					connected_vertex.insert(it.first);
             for (Halfedge_iterator it = this->skeleton->halfedges_begin(); it != this->skeleton->halfedges_end(); ++it) {
