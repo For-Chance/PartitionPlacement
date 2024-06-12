@@ -223,37 +223,26 @@ namespace Partition
                 } while (h != v->halfedge());
                 return adj_vertex;
                 };
-            auto get_adj_latest_vertex = [&](Vertex_handle v) {
-				Vertex_handle latest_vertex = v;
-                auto latest_time = v->time();
-                std::cout << latest_time << " ";
-				Halfedge_handle h = v->halfedge();
-				do {
-					Vertex_handle adj = h->opposite()->vertex();
-                    if (centerline_vertex2cnt.find(adj) != centerline_vertex2cnt.end())
-					    if(adj->time() > latest_time) {
-						    latest_time = adj->time();
-						    latest_vertex = adj;
-                            std::cout << latest_time << " ";
-					    }
-					h = h->next()->opposite();
-				} while (h != v->halfedge());
-                std::cout << std::endl;
-				return latest_vertex;
-				};
+            auto get_next_ans_vertex = [&](Vertex_handle v, bool& delete_v) {
+                std::vector<Vertex_handle>& adj_vertices = get_adj_centerline_vertex(v);
+                if (adj_vertices.size() != 1) {
+                    delete_v = false;
+                    return v;
+                }
+                return adj_vertices[0];
+                };
+
             std::unordered_set<Vertex_handle> leaf_vertex;
             for (auto it : centerline_vertex2cnt)
                 if (it.second == 1)
                     leaf_vertex.insert(it.first);
             for (auto it : leaf_vertex) {
                 Vertex_handle cur_v = it;
-                do {
-                    Vertex_handle adj_vertex = get_adj_latest_vertex(cur_v);
-                    if (adj_vertex == cur_v)
-						break;
+                bool delete_v = true;
+                while (delete_v && stop_vertices.find(cur_v) == stop_vertices.end()) {
                     centerline_vertex2cnt.erase(cur_v);
-                    cur_v = adj_vertex;
-                } while (stop_vertices.find(cur_v) == stop_vertices.end());
+                    cur_v = get_next_ans_vertex(cur_v, delete_v);
+                }
             }
             std::unordered_set<Vertex_handle> connected_vertex;
             for(auto& it : centerline_vertex2cnt)
