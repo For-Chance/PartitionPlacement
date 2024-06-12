@@ -85,6 +85,7 @@ namespace CenterLine {
 		if (context.centerlineProps.isSmooth == false) {
 			auto result = clSolver.centerline();
 			auto sub_line = clSolver.sub_centerline();
+			auto log_points = clSolver.get_log_points();
 
 			// # get all points
 			for (auto& seg : result) {
@@ -122,7 +123,8 @@ namespace CenterLine {
 			QApplication app(argc, const_cast<char**>(argv));
 			std::string title = "output-" + controlProps.InputFile;
 			CGAL::CenterLineViewer<K> mainwindow(app.activeWindow(), *PolyParts.begin(), title.c_str());
-			mainwindow.drawPartitions(PolyParts, CGAL::Color(0, 0, 0), CGAL::Color(67, 177, 235));
+			//mainwindow.drawPartitions(PolyParts, CGAL::Color(0, 0, 0), CGAL::Color(67, 177, 235));
+			mainwindow.drawPoints(log_points, CGAL::Color(0, 0, 255));
 			mainwindow.drawTree(points, segs, CGAL::Color(255, 255, 0));	// centerline
 			mainwindow.drawTree(points, new_segs, CGAL::Color(255, 0, 0));	// connect line of centerline
 			mainwindow.drawTree(points, sub_segs, CGAL::Color(0, 255, 0));

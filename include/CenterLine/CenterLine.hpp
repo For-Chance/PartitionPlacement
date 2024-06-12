@@ -209,6 +209,7 @@ namespace CenterLine {
         std::string centerline_geojson() const { return GeoJSON::segments_to_geojson<K>(res_segments); }
         std::string sub_centerline_geojson() const { return GeoJSON::segments_to_geojson<K>(sub_segments); }
         std::string centerline_smooth_geojson() const { return GeoJSON::segments_to_geojson<K>(smooth_segments); }
+        std::vector<Point_2> get_log_points() const { return log_points; }
 
     private:
         /// <summary>
@@ -326,6 +327,7 @@ namespace CenterLine {
         std::vector<PointData*> point_data_pool;
         std::vector<Segment_2> res_segments, sub_segments, smooth_segments;
         std::vector<std::pair<FT, FT>> res_seg_dis;
+        std::vector<Point_2> log_points;
     };
 
     namespace SEH {
@@ -514,6 +516,8 @@ namespace CenterLine {
                     stop_loc_ids.insert(e->start_loc);
                 }
             }
+        for(auto e : start_edges)
+            log_points.push_back(locations[e->start_loc].point);
         for (PointData* e : start_edges) {
             PointData* nowEdge = e;
             while (nowEdge != nullptr && stop_loc_ids.find(nowEdge->start_loc) == stop_loc_ids.end()) {
