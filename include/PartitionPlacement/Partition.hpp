@@ -128,7 +128,7 @@ namespace Partition
         std::vector<Segment_2> skeleton_centerlines;
         std::vector<Segment_2> skeleton_otherlines;
         std::vector<Polygon_2> skeleton_faces;
-        std::vector<std::vector<Polygon_2>> init_partition;
+        std::vector<std::vector<Polygon_2>> partition;
         std::vector<Polygon_2> uncertain_parts;
         std::vector<Segment_2> split_segments;
         std::vector<Point_2> log_points;
@@ -152,6 +152,7 @@ namespace Partition
                 Vertex_handle from = it->opposite()->vertex(), to = it->vertex();
 				skeleton_segments.push_back(Segment_2(from->point(), to->point()));
             }
+            Decorator decorator(*this->skeleton);
             
 			std::cout << "partition..." << std::endl;
             // 3. find centerline
@@ -280,6 +281,7 @@ namespace Partition
 
             // 4. partition
             // 4.1 init partition according to connected vertex
+            std::vector<std::vector<Face_handle>> Face_partition;
             std::vector<std::unordered_set<Vertex_handle>> parts;
             std::unordered_set<Vertex_handle> visited; 
             for (Vertex_handle it : connected_vertex) {
@@ -311,7 +313,7 @@ namespace Partition
             for (int part_num = 0; part_num < parts.size(); ++part_num)
                 for (auto v : parts[part_num])
                     v2pn[v].insert(part_num);
-			this->init_partition = std::vector<std::vector<Polygon_2>>(parts.size());
+            Face_partition = std::vector<std::vector<Face_handle>>(parts.size());
 
             // 4.2 find certain faces and uncertain faces
             auto get_adj_faces = [&](const Face_handle& face) {
@@ -335,8 +337,10 @@ namespace Partition
 					Halfedge_handle h = v->halfedge();
 					do {
                         Vertex_handle from = h->opposite()->vertex(), to = h->vertex();
-						if(part.find(from) != part.end() && part.find(to) != part.end() && he2pn.find(h) == he2pn.end())
+                        if (part.find(from) != part.end() && part.find(to) != part.end() && he2pn.find(h) == he2pn.end()) {
                             he2pn[h] = part_num;
+                            he2pn[h->opposite()] = part_num;
+                        }
 						h = h->next()->opposite();
 					} while (h != v->halfedge());
 				}
@@ -368,7 +372,7 @@ namespace Partition
                     q.pop();
                     certain_faces[part_num].insert(cur_face);
                     face2pn[cur_face] = part_num;
-                    init_partition[part_num].push_back(get_Poly_from_Face(cur_face));
+                    Face_partition[part_num].push_back(cur_face);
                     std::vector<Face_handle>& adj_faces = get_adj_faces(cur_face);
                     for(auto& adj_face : adj_faces) {
                         bool is_same_part = true;
@@ -386,6 +390,16 @@ namespace Partition
 					}
                 }
             }
+
+            // 4.3 get halfedge 2 part num
+            for (int part_num = 0; part_num < Face_partition.size(); part_num++)
+                for (const Face_handle& face : Face_partition[part_num]) {
+                    Halfedge_handle cur_h = face->halfedge();
+                    do {
+                        he2pn[cur_h] = part_num;
+                        cur_h = cur_h->next();
+                    } while (cur_h != face->halfedge());
+                }
 
             // spilit uncertain faces
             auto areTwoIntersectionPointsInside = [](const Polygon_2& polygon, const Segment_2& segment) {
@@ -445,6 +459,8 @@ namespace Partition
                     h = h->next();
                 } while (h != face->halfedge());
                 // cal A
+                if (border_edge == nullptr)
+                    continue;
                 Vertex_handle A = border_edge->vertex();
                 Halfedge_handle border_next_halfedge = border_edge->next();
                 h = border_next_halfedge;
@@ -486,64 +502,65 @@ namespace Partition
                 std::vector<std::pair<Vertex_handle, VAttr>> split_vertexs_vec(split_vertexs.begin(), split_vertexs.end());
                 std::sort(split_vertexs_vec.begin(), split_vertexs_vec.end());
                 int another_part_num = -1;
-                Polygon_2 spare_poly = poly;
+                Face_handle spare_face = face;
                 for (auto& sv : split_vertexs_vec) {
                     Vertex_handle& split_v = sv.first;
                     VAttr& attr = sv.second;
                     std::cout << "chooseNum = " << attr.chooseNum << ", dis_to_A = " << attr.dis_to_A << ", dist_to_B = " << attr.dis_to_B << ", IsIntersect_to_A = " << attr.IsIntersect_to_A << ", IsIntersect_to_B = " << attr.IsIntersect_to_B << std::endl;
-                    Polygon_2 poly_paint;
+                    Face_handle face_paint;
                     int part_num = -1;
-                    another_part_num = -1;
                     if (attr.chooseNum == 1) {
-                        Vertex_handle A = attr.A;
-                        Halfedge_handle cur_h = A->halfedge();
-                        Vertex_handle cur_v;
-                        do {
-                            cur_v = cur_h->vertex();
-                            if (v2pn[cur_v].size() == 1)
-                                part_num = *v2pn[cur_v].begin();
-                            poly_paint.push_back(cur_v->point());
+                        Halfedge_handle cur_h = border_edge;
+                        Vertex_handle cur_v = border_edge->vertex();
+                        while (cur_v != split_v) {
+                            if (cur_h->is_bisector() && he2pn.find(cur_h->opposite()) != he2pn.end())
+                                part_num = he2pn[cur_h->opposite()];
                             cur_h = cur_h->next();
-                        } while (cur_v != split_v);
-                        do {
                             cur_v = cur_h->vertex();
-                            if (v2pn[cur_v].size() == 1 && another_part_num == -1) {
-                                another_part_num = *v2pn[cur_v].begin();
-                            }
-                            cur_h = cur_h->next();
-                        } while (cur_v != border_edge->prev()->vertex());
+                        };
+                        Halfedge_handle split_he = decorator.split_face(cur_h, border_edge);
+                        spare_face = split_he->opposite()->face();
                     }
                     else if (attr.chooseNum == 2) {
+                        Vertex_handle B = attr.B;
                         Halfedge_handle cur_h = border_edge;
-                        Vertex_handle cur_v;
-                        do {
-                            cur_v = cur_h->prev()->vertex();
-                            if (v2pn[cur_v].size() == 1 && another_part_num == -1)
-								another_part_num = *v2pn[cur_v].begin();
-                            cur_h = cur_h->prev();
-                        } while (cur_v != split_v);
-                        do {
-                            cur_v = cur_h->vertex();
-                            if (v2pn[cur_v].size() == 1) {
-                                part_num = *v2pn[cur_v].begin();
-                            }
-                            poly_paint.push_back(cur_v->point());
+                        Vertex_handle cur_v = border_edge->vertex();
+                        while (cur_v != split_v) {
                             cur_h = cur_h->next();
-                        } while (cur_v != border_edge->prev()->vertex());
+                            cur_v = cur_h->vertex();
+                        };
+                        Halfedge_handle end_he = cur_h;
+                        while (cur_v != B) {
+                            if (cur_h->is_bisector() && he2pn.find(cur_h->opposite()) != he2pn.end())
+                                part_num = he2pn[cur_h->opposite()];
+                            cur_h = cur_h->next();
+                            cur_v = cur_h->vertex();
+                        };
+                        Halfedge_handle split_he = decorator.split_face(cur_h, end_he);
+                        spare_face = split_he->opposite()->face();
                     }
                     else {
                         continue;
                     }
                     // TODO: another part
                     if (part_num != -1)
-                        init_partition[part_num].push_back(poly_paint);
-                    std::list<Polygon_with_holes_2> res;
-                    CGAL::symmetric_difference(spare_poly, poly_paint, std::back_inserter(res));
-                    spare_poly = res.front().outer_boundary();
+                        Face_partition[part_num].push_back(face_paint);
                 }
-                if(another_part_num != -1)
-					init_partition[another_part_num].push_back(spare_poly);
+                Halfedge_handle cur_h = spare_face->halfedge();
+                int part_num = -1;
+                do {
+					if (cur_h->is_bisector() && he2pn.find(cur_h->opposite()) != he2pn.end())
+                        part_num = he2pn[cur_h->opposite()];
+					cur_h = cur_h->next();
+				} while (cur_h != spare_face->halfedge());
+                if(part_num != -1)
+					Face_partition[part_num].push_back(spare_face);
             }
+            this->partition = std::vector<std::vector<Polygon_2>>(Face_partition.size());
+            for(int part_num = 0;part_num < Face_partition.size();part_num++)
+				for (const Face_handle& face : Face_partition[part_num])
+                    if(face != nullptr)
+					    this->partition[part_num].push_back(get_Poly_from_Face(face));
             std::cout << "partition done!" << std::endl;
         }
 		else

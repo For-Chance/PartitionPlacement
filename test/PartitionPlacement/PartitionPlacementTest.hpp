@@ -99,7 +99,7 @@ namespace ParitionPlacement
 		const std::vector<Segment_2>& skeleton_centerlines = ppSolver.get_skeleton_centerlines();
 		const std::vector<Segment_2>& skeleton_otherlines = ppSolver.get_skeleton_otherlines();
 		const std::vector<Polygon_2>& skeleton_faces = ppSolver.get_skeleton_faces();
-		const std::vector<std::vector<Polygon_2>>& init_partition = ppSolver.get_init_partition();
+		const std::vector<std::vector<Polygon_2>>& partition = ppSolver.get_partition();
 		const std::vector<Polygon_2>& uncertain_parts = ppSolver.get_uncertain_parts();
         const std::vector<Segment_2>& split_segments = ppSolver.get_split_segments();
         const std::vector<Point_2>& log_points = ppSolver.get_log_points();
@@ -137,7 +137,7 @@ namespace ParitionPlacement
         if (controlProps.showPartitions) {
             /*mainwindow.drawPartitions(PolyParts_holes, Segment_Color, Holes_Color, Point_Color);
             mainwindow.drawPartitions(PolyParts_outer, Segment_Color, Room_Color, Point_Color);*/
-            for (auto part : init_partition) {
+            for (auto part : partition) {
 				CGAL::Color part_Color(rand() % 255, rand() % 255, rand() % 255);
                 mainwindow.drawPartitions(part, Segment_Color, part_Color, Point_Color);
             }
