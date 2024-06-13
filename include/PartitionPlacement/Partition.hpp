@@ -513,12 +513,15 @@ namespace Partition
                         Halfedge_handle cur_h = border_edge;
                         Vertex_handle cur_v = border_edge->vertex();
                         while (cur_v != split_v) {
-                            if (cur_h->is_bisector() && he2pn.find(cur_h->opposite()) != he2pn.end())
+                            if (he2pn.find(cur_h->opposite()) != he2pn.end())
                                 part_num = he2pn[cur_h->opposite()];
+                            else if(he2pn.find(cur_h) != he2pn.end())
+                                part_num = he2pn[cur_h];
                             cur_h = cur_h->next();
                             cur_v = cur_h->vertex();
                         };
                         Halfedge_handle split_he = decorator.split_face(cur_h, border_edge);
+                        face_paint = split_he->face();
                         spare_face = split_he->opposite()->face();
                     }
                     else if (attr.chooseNum == 2) {
@@ -531,12 +534,13 @@ namespace Partition
                         };
                         Halfedge_handle end_he = cur_h;
                         while (cur_v != B) {
-                            if (cur_h->is_bisector() && he2pn.find(cur_h->opposite()) != he2pn.end())
+                            if (he2pn.find(cur_h->opposite()) != he2pn.end())
                                 part_num = he2pn[cur_h->opposite()];
                             cur_h = cur_h->next();
                             cur_v = cur_h->vertex();
                         };
                         Halfedge_handle split_he = decorator.split_face(cur_h, end_he);
+                        face_paint = split_he->face();
                         spare_face = split_he->opposite()->face();
                     }
                     else {
@@ -549,8 +553,14 @@ namespace Partition
                 Halfedge_handle cur_h = spare_face->halfedge();
                 int part_num = -1;
                 do {
-					if (cur_h->is_bisector() && he2pn.find(cur_h->opposite()) != he2pn.end())
-                        part_num = he2pn[cur_h->opposite()];
+                    if (he2pn.find(cur_h->opposite()) != he2pn.end()) {
+                        if(part_num == -1)
+                            part_num = he2pn[cur_h->opposite()];
+                        else if (part_num != he2pn[cur_h->opposite()]) {
+                            part_num = -1;
+                            break;
+                        }
+                    }
 					cur_h = cur_h->next();
 				} while (cur_h != spare_face->halfedge());
                 if(part_num != -1)
