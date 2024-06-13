@@ -485,12 +485,15 @@ namespace Partition
                 // sort according to choose num, B first, then A, then both not
                 std::vector<std::pair<Vertex_handle, VAttr>> split_vertexs_vec(split_vertexs.begin(), split_vertexs.end());
                 std::sort(split_vertexs_vec.begin(), split_vertexs_vec.end());
+                int another_part_num = -1;
+                Polygon_2 spare_poly = poly;
                 for (auto& sv : split_vertexs_vec) {
                     Vertex_handle& split_v = sv.first;
                     VAttr& attr = sv.second;
                     std::cout << "chooseNum = " << attr.chooseNum << ", dis_to_A = " << attr.dis_to_A << ", dist_to_B = " << attr.dis_to_B << ", IsIntersect_to_A = " << attr.IsIntersect_to_A << ", IsIntersect_to_B = " << attr.IsIntersect_to_B << std::endl;
                     Polygon_2 poly_paint;
                     int part_num = -1;
+                    another_part_num = -1;
                     if (attr.chooseNum == 1) {
                         Vertex_handle A = attr.A;
                         Halfedge_handle cur_h = A->halfedge();
@@ -502,12 +505,21 @@ namespace Partition
                             poly_paint.push_back(cur_v->point());
                             cur_h = cur_h->next();
                         } while (cur_v != split_v);
+                        do {
+                            cur_v = cur_h->vertex();
+                            if (v2pn[cur_v].size() == 1 && another_part_num == -1) {
+                                another_part_num = *v2pn[cur_v].begin();
+                            }
+                            cur_h = cur_h->next();
+                        } while (cur_v != border_edge->prev()->vertex());
                     }
                     else if (attr.chooseNum == 2) {
                         Halfedge_handle cur_h = border_edge;
                         Vertex_handle cur_v;
                         do {
                             cur_v = cur_h->prev()->vertex();
+                            if (v2pn[cur_v].size() == 1 && another_part_num == -1)
+								another_part_num = *v2pn[cur_v].begin();
                             cur_h = cur_h->prev();
                         } while (cur_v != split_v);
                         do {
@@ -525,7 +537,12 @@ namespace Partition
                     // TODO: another part
                     if (part_num != -1)
                         init_partition[part_num].push_back(poly_paint);
+                    std::list<Polygon_with_holes_2> res;
+                    CGAL::symmetric_difference(spare_poly, poly_paint, std::back_inserter(res));
+                    spare_poly = res.front().outer_boundary();
                 }
+                if(another_part_num != -1)
+					init_partition[another_part_num].push_back(spare_poly);
             }
             std::cout << "partition done!" << std::endl;
         }
