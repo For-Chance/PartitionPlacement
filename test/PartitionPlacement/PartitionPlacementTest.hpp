@@ -81,6 +81,7 @@ namespace ParitionPlacement
     void PartitionPlacementTest::parseConfigFile(const std::string& config_file, Context<K>& context, ControlProps& controlProps) {
         Json::Value p = GeoJSON::parse_propsjson(config_file);
         context.ppProps.partProps.withSimplifyBoundary = p["PartitionProps"]["withSimplifyBoundary"].asBool();
+        context.ppProps.partProps.simplify_order = p["PartitionProps"]["simplify_order"].asString();
         controlProps.InputFile = p["ControlProps"]["InputFile"].asString();
         controlProps.OutputFile = p["ControlProps"]["OutputFile"].asString();
 		controlProps.withSimplifyBoundary = p["ControlProps"]["withSimplifyBoundary"].asBool();

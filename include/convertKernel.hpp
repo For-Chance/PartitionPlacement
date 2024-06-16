@@ -54,6 +54,10 @@ namespace KernelConverter {
     template <typename From, typename To, typename Converter>
     struct KernelConverter : public CGAL::Cartesian_converter<From, To, Converter> {
         using K = typename To;
+        typename K::FT convert(const typename From::FT& x) const
+		{
+			return operator()(x);
+		}
         CGAL::Point_2<K> convert(const CGAL::Point_2<From>& point) const
 		{
 			return operator()(point);

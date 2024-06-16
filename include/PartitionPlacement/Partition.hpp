@@ -29,8 +29,10 @@ namespace Partition
     template <typename K>
     struct PartitionProps {
         bool withSimplifyBoundary;
+        std::string simplify_order;
         PartitionProps() {
             withSimplifyBoundary = true;
+            simplify_order = "0";
         }
     };
 
@@ -163,7 +165,10 @@ namespace Partition
 		this->origin_space = space;
         if (props.withSimplifyBoundary) {
             // 1. Simplify Boundary
-			SimplifyBoundary::Solver<InnerK> sbSolver(this->K2InnerK.convert(this->origin_space));
+            SimplifyBoundary::SimplifyProps<InnerK> simpProps = SimplifyBoundary::SimplifyProps<InnerK>();
+            SimplifyBoundary::ExpandProps<InnerK> expandProps = SimplifyBoundary::ExpandProps<InnerK>();
+            expandProps.simplify_order = props.simplify_order;
+			SimplifyBoundary::Solver<InnerK> sbSolver(this->K2InnerK.convert(this->origin_space), simpProps, expandProps);
             this->polygon = sbSolver.simplify_space;
             
             // 2. skeleton 

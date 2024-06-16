@@ -1,6 +1,7 @@
 {
     "PartitionProps": {
-        "withSimplifyBoundary": true
+        "withSimplifyBoundary": true,
+	"simplify_order": "101"
     },
     "PlacementProps": {
         
