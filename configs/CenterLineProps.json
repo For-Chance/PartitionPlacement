@@ -8,7 +8,7 @@
     "Cprops": {
         "showId": true,
         "showMode": 2,
-        "InputFile": "../data/sample11.Info.geojson",
+        "InputFile": "../data/sample7.Info.geojson",
         "OutputFile": ""
     }
 }

@@ -161,7 +161,7 @@ namespace SimplifyBoundary{
 
         int centerX2 = screenWidth * 2 / 4;
         std::string title2 = "viewer-" + controlProps.InputFile;
-        CGAL::CenterLineViewer<Polygon_2> mainwindow2(app.activeWindow(), *PolyParts_simplify_outer.begin(), title2.c_str());
+        CGAL::CenterLineViewer<K> mainwindow2(app.activeWindow(), *PolyParts_simplify_outer.begin(), title2.c_str());
         if (controlProps.showId)
             for (auto p2i : pointIdVec) {
                 mainwindow2.drawText(p2i.first, QString::number(p2i.second));

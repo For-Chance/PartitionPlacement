@@ -18,14 +18,14 @@
         "isProcess": false
     },
     "Eprops": {
-        "simplify_order": "0",
+        "simplify_order": "101",
         "offset": 1000,
         "tri_simplify_cost": 0.7
     },
     "Cprops": {
         "showId": true,
         "showMode": 2,
-        "InputFile": "../data/sample10.Info.geojson",
+        "InputFile": "../data/sample7.Info.geojson",
         "OutputFile": ""
     }
 }
