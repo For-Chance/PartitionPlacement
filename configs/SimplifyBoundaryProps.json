@@ -20,12 +20,13 @@
     "Eprops": {
         "simplify_order": "101",
         "offset": 1000,
-        "tri_simplify_cost": 0.7
+        "tri_simplify_cost": 0.7,
+	"isPostProcess": true
     },
     "Cprops": {
         "showId": true,
         "showMode": 2,
-        "InputFile": "../data/sample7.Info.geojson",
+        "InputFile": "../data/sample11.Info.geojson",
         "OutputFile": ""
     }
 }

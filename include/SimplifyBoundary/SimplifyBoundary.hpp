@@ -66,23 +66,21 @@ namespace SimplifyBoundary {
         using FT = typename K::FT;
         std::string simplify_order;
         FT offset, tri_simplify_cost;
+        bool isPostProcess;
         ExpandProps() {
             simplify_order = "101";
             offset = 100;
             tri_simplify_cost = 0.7;
+            isPostProcess = true;
         }
         ExpandProps(const std::string& type) {
             if (type == "HOUSE")
-            {
                 simplify_order = "101";
-                offset = 100;
-                tri_simplify_cost = 0.7;
-            }
-            else if (type == "RAMP") {
+            else if (type == "RAMP") 
                 simplify_order = "2";
-                offset = 1000;
-                tri_simplify_cost = 0.7;
-            }
+            offset = 1000;
+            tri_simplify_cost = 0.7;
+            isPostProcess = true;
         }
     };
 
@@ -221,6 +219,7 @@ namespace SimplifyBoundary {
             return Kconverter.convert(new_polygon);
         }
         inline Polygon_with_holes_2 tri_simplify(const Polygon_with_holes_2& polygon, const ExpandProps& props);
+        Polygon_with_holes_2 post_process(const Polygon_with_holes_2& polygon);
 
         struct pair_hash;
         void construct_line(std::unordered_map<int, int>& loc2degree, const int& loc, const int& last_id, std::unordered_set<std::pair<int, int>, pair_hash>& done_edges, std::vector<Point_2>& line);
@@ -1505,6 +1504,8 @@ namespace SimplifyBoundary{
                 new_polygon = tri_simplify(new_polygon, Eprops);
                 break;
             }
+        if(Eprops.isPostProcess)
+			new_polygon = post_process(new_polygon);
 		std::cout << "*****************************\tend simplify\t*****************************" << std::endl;
         return new_polygon;
     }
@@ -1835,6 +1836,48 @@ namespace SimplifyBoundary{
                 result.emplace_back(line[i - 1], line[i]);
             }
         }
+    }
+
+    template <typename K>
+    CGAL::Polygon_with_holes_2<K> Solver<K>::post_process(const Polygon_with_holes_2& polygon) {
+        auto clear_polygon = [](const Polygon_2& polygon) {
+            auto clear_points = [](const std::vector<Point_2> ps, int& next_start_idx) {
+                std::vector<Point_2> point_list;
+                std::vector<Point_2> points = ps;
+                FT eps = 1e-3;
+                points.push_back(points[0]);
+                point_list.push_back(points[0]);
+                for (int i = 1; i < points.size() - 1; i++) {
+                    const Point_2& p = points[i - 1];
+                    const Point_2& q = points[i];
+                    const Point_2& r = points[i + 1];
+                    Segment_2 pq(p, q);
+                    Vector_2 pq_v = pq.to_vector();
+                    Segment_2 qr(q, r);
+                    Vector_2 qr_v = qr.to_vector();
+                    Segment_2 pr(p, r);
+                    bool is_skip_q = equal(pq.squared_length(), 0, eps) || equal(qr.squared_length(), 0, eps) || equal(pq_v.x() * qr_v.y() - pq_v.y() * qr_v.x(), 0, eps);
+                    if (!is_skip_q) {
+                        point_list.push_back(q);
+                        if (next_start_idx == -1)
+                            next_start_idx = i;
+                    }
+                }
+                return point_list;
+                };
+            int next_start_idx = -1;
+            std::vector<Point_2> points = polygon.vertices();
+            std::vector<Point_2> point_list_1 = clear_points(points, next_start_idx);
+            std::vector<Point_2> point_list_2(point_list_1.begin() + next_start_idx, point_list_1.end());
+            point_list_2.insert(point_list_2.end(), point_list_1.begin(), point_list_1.begin() + next_start_idx);
+            std::vector<Point_2> res_point_list = clear_points(point_list_2, next_start_idx);
+            return Polygon_2(res_point_list.begin(), res_point_list.end());
+            };
+        Polygon_2 outer = clear_polygon(polygon.outer_boundary());
+        std::vector<Polygon_2> holes;
+        for (auto it = polygon.holes_begin(); it != polygon.holes_end(); it++)
+			holes.push_back(clear_polygon(*it));
+        return Polygon_with_holes_2(outer, holes.begin(), holes.end());
     }
 }
 #endif // SIMPLIFYBOUNDARY_HPP

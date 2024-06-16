@@ -103,6 +103,7 @@ namespace SimplifyBoundary{
         context.simpProps.expandProps.simplify_order = p["Eprops"]["simplify_order"].asString();
         context.simpProps.expandProps.offset = p["Eprops"]["offset"].asDouble();
         context.simpProps.expandProps.tri_simplify_cost = p["Eprops"]["tri_simplify_cost"].asDouble();
+        context.simpProps.expandProps.isPostProcess = p["Eprops"]["isPostProcess"].asBool();
         controlProps.showId = p["Cprops"]["showId"].asBool();
         controlProps.showMode = p["Cprops"]["showMode"].asInt();
         controlProps.InputFile = p["Cprops"]["InputFile"].asString();
