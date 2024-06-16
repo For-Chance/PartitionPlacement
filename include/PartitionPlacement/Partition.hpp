@@ -2,7 +2,7 @@
 #define PARTITION_HPP
 #include "stdafx.h"
 
-#include <CGAL/Exact_predicates_exact_constructions_kernel.h> 
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h> 
 #include <CGAL/Polygon_with_holes_2.h>
 #include <CGAL/Polygon_2.h>
 #include <CGAL/Point_2.h>
@@ -19,6 +19,7 @@
 #include <chrono>
 
 #include "SimplifyBoundary.hpp"
+#include "convertKernel.hpp"
 
 namespace Partition
 {
@@ -37,16 +38,17 @@ namespace Partition
     template <typename K>
     class Solver
     {
-        using FT = typename K::FT;
-        using Polygon_with_holes_2 = CGAL::Polygon_with_holes_2<K>;
-        using Polygon_2 = CGAL::Polygon_2<K>;
-        using Point_2 = CGAL::Point_2<K>;
-		using Segment_2 = CGAL::Segment_2<K>;
+        using InnerK = CGAL::Exact_predicates_inexact_constructions_kernel;
+        using FT = typename InnerK::FT;
+        using Polygon_with_holes_2 = CGAL::Polygon_with_holes_2<InnerK>;
+        using Polygon_2 = CGAL::Polygon_2<InnerK>;
+        using Point_2 = CGAL::Point_2<InnerK>;
+		using Segment_2 = CGAL::Segment_2<InnerK>;
         using Polygon_list = std::list<Polygon_2>;
-        using Vector_2 = CGAL::Vector_2<K>;
-        using Line_2 = CGAL::Line_2<K>;
-        using Polygon_set_2 = CGAL::Polygon_set_2<K>;
-        using Ss = CGAL::Straight_skeleton_2<K>;
+        using Vector_2 = CGAL::Vector_2<InnerK>;
+        using Line_2 = CGAL::Line_2<InnerK>;
+        using Polygon_set_2 = CGAL::Polygon_set_2<InnerK>;
+        using Ss = CGAL::Straight_skeleton_2<InnerK>;
         using Halfedge_iterator = typename Ss::Halfedge_iterator;
         using Halfedge_handle = typename Ss::Halfedge_handle;
         using Vertex_handle = typename Ss::Vertex_handle;
@@ -55,7 +57,7 @@ namespace Partition
 		using Face_iterator = typename Ss::Face_iterator;
         using HDS = typename Ss::Base;
         using Decorator = CGAL::HalfedgeDS_decorator<HDS>;
-        using SsBuilderTraits = CGAL::Straight_skeleton_builder_traits_2<K>;
+        using SsBuilderTraits = CGAL::Straight_skeleton_builder_traits_2<InnerK>;
         using SsBuilder = CGAL::Straight_skeleton_builder_2<SsBuilderTraits, Ss>;
 
         using PartitionProps = PartitionProps<K>;
@@ -117,14 +119,13 @@ namespace Partition
             } while (h != first);
             return poly;
         }
-    public:
-        Solver() {}
-        Solver(const Polygon_with_holes_2& space, const PartitionProps& props = PartitionProps());
-        
-        Polygon_with_holes_2 origin_space;
+
+        KernelConverter::KernelConverter<K, InnerK, KernelConverter::NumberConverter<typename K::FT, FT>>K2InnerK;
+        KernelConverter::KernelConverter<InnerK, K, KernelConverter::NumberConverter<FT, typename K::FT>>InnerK2K;
+        CGAL::Polygon_with_holes_2<K> origin_space;
         Polygon_with_holes_2 polygon;
         boost::shared_ptr<Ss> skeleton;
-		std::vector<Segment_2> skeleton_segments;
+        std::vector<Segment_2> skeleton_segments;
         std::vector<Segment_2> skeleton_centerlines;
         std::vector<Segment_2> skeleton_otherlines;
         std::vector<Polygon_2> skeleton_faces;
@@ -132,18 +133,37 @@ namespace Partition
         std::vector<Polygon_2> uncertain_parts;
         std::vector<Segment_2> split_segments;
         std::vector<Point_2> log_points;
+    public:
+        Solver() {}
+        Solver(const CGAL::Polygon_with_holes_2<K>& space, const PartitionProps& props = PartitionProps());
+
+        CGAL::Polygon_with_holes_2<K> get_origin_space() const { return this->origin_space; }
+        CGAL::Polygon_with_holes_2<K> get_polygon() const { return this->InnerK2K.convert(this->polygon); }
+        std::vector<CGAL::Segment_2<K>> get_skeleton_segments() const {this->InnerK2K.convert(this->skeleton_segments); }
+        std::vector<CGAL::Segment_2<K>> get_skeleton_centerlines() const { return this->InnerK2K.convert(this->skeleton_centerlines); }
+        std::vector<CGAL::Segment_2<K>> get_skeleton_otherlines() const { return this->InnerK2K.convert(this->skeleton_otherlines); }
+        std::vector<CGAL::Polygon_2<K>> get_skeleton_faces() const { return this->InnerK2K.convert(this->skeleton_faces); }
+        std::vector<std::vector<CGAL::Polygon_2<K>>> get_partition() const {
+            std::vector<std::vector<CGAL::Polygon_2<K>>> res;
+            for (const auto& part : this->partition)
+				res.push_back(this->InnerK2K.convert(part));
+            return res;
+        }
+        std::vector<CGAL::Polygon_2<K>> get_uncertain_parts() const { return this->InnerK2K.convert(this->uncertain_parts); }
+        std::vector<CGAL::Segment_2<K>> get_split_segments() const { return this->InnerK2K.convert(this->split_segments); }
+        std::vector<CGAL::Point_2<K>> get_log_points() const { return this->InnerK2K.convert(this->log_points); }
     };
 }
 
 namespace Partition
 {
     template <typename K>
-    Solver<K>::Solver(const Polygon_with_holes_2& space, const PartitionProps& props)
+    Solver<K>::Solver(const CGAL::Polygon_with_holes_2<K>& space, const PartitionProps& props)
     {
 		this->origin_space = space;
         if (props.withSimplifyBoundary) {
             // 1. Simplify Boundary
-			SimplifyBoundary::Solver<K> sbSolver(this->origin_space);
+			SimplifyBoundary::Solver<InnerK> sbSolver(this->K2InnerK.convert(this->origin_space));
             this->polygon = sbSolver.simplify_space;
             
             // 2. skeleton 
@@ -574,7 +594,7 @@ namespace Partition
             std::cout << "partition done!" << std::endl;
         }
 		else
-			polygon = origin_space;
+			polygon = this->K2InnerK.convert(origin_space);
     }
 } // namespace Partition
 #endif // PARTITION_HPP

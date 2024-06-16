@@ -2,6 +2,8 @@
 #define CAST_KERNEL_H
 #include <CGAL/Cartesian_converter.h>
 #include <CGAL/Exact_predicates_exact_constructions_kernel.h>
+#include <CGAL/Point_2.h>
+#include <CGAL/Segment_2.h>
 #include <CGAL/Polygon_2.h>
 #include <CGAL/Polygon_with_holes_2.h>
 
@@ -52,12 +54,20 @@ namespace KernelConverter {
     template <typename From, typename To, typename Converter>
     struct KernelConverter : public CGAL::Cartesian_converter<From, To, Converter> {
         using K = typename To;
-        CGAL::Polygon_2<K> convert(const CGAL::Polygon_2<From>& poly)
+        CGAL::Point_2<K> convert(const CGAL::Point_2<From>& point) const
+		{
+			return operator()(point);
+		}
+        CGAL::Segment_2<K> convert(const CGAL::Segment_2<From>& seg) const
+		{
+			return CGAL::Segment_2<K>(convert(seg.source()), convert(seg.target()));
+		}
+        CGAL::Polygon_2<K> convert(const CGAL::Polygon_2<From>& poly) const
         {
             std::vector<K::Point_2> tmp_pts;
             K::Point_2 last_p, cur_p;
             bool first = true;
-            for (auto it = poly.vertices_begin();it != poly.vertices_end();++it) {
+            for (auto it = poly.vertices_begin(); it != poly.vertices_end(); ++it) {
                 CGAL::Point_2<From>& point = *it;
                 cur_p = operator()(point);
                 if (first)
@@ -73,7 +83,7 @@ namespace KernelConverter {
                 throw("polygon degenerated");
             return CGAL::Polygon_2<K>(tmp_pts.begin(), tmp_pts.end());
         }
-        CGAL::Polygon_with_holes_2<K> convert(const CGAL::Polygon_with_holes_2<From>& poly)
+        CGAL::Polygon_with_holes_2<K> convert(const CGAL::Polygon_with_holes_2<From>& poly) const
         {
             CGAL::Polygon_2<K> bound = convert(poly.outer_boundary());
 
@@ -83,12 +93,30 @@ namespace KernelConverter {
             }
             return CGAL::Polygon_with_holes_2<K>(bound, holes.begin(), holes.end());
         }
-        std::vector<CGAL::Point_2<K>> convert(const std::vector<CGAL::Point_2<From>>& points) {
+        std::vector<CGAL::Point_2<K>> convert(const std::vector<CGAL::Point_2<From>>& points) const {
             std::vector<CGAL::Point_2<K>> res(points.size());
             for (int i = 0; i < points.size(); i++)
                 res[i] = operator()(points[i]);
             return res;
         }
+        std::vector<CGAL::Segment_2<K>> convert(const std::vector<CGAL::Segment_2<From>>& segs) const {
+			std::vector<CGAL::Segment_2<K>> res(segs.size());
+			for (int i = 0; i < segs.size(); i++)
+				res[i] = convert(segs[i]);
+			return res;
+		}
+        std::vector<CGAL::Polygon_2<K>> convert(const std::vector<CGAL::Polygon_2<From>>& polys) const {
+            std::vector<CGAL::Polygon_2<K>> res(polys.size());
+            for (int i = 0; i < polys.size(); i++)
+                res[i] = convert(polys[i]);
+            return res;
+        }
+        std::vector<CGAL::Polygon_with_holes_2<K>> convert(const std::vector<CGAL::Polygon_with_holes_2<From>>& polys) const {
+			std::vector<CGAL::Polygon_with_holes_2<K>> res(polys.size());
+			for (int i = 0; i < polys.size(); i++)
+				res[i] = convert(polys[i]);
+			return res;
+		}
     };
 }
 #endif

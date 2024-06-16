@@ -25,14 +25,14 @@ namespace ParitionPlacement
     public:
         Polygon_with_holes_2 origin_space;
         Polygon_with_holes_2 polygon;
-        std::vector<Segment_2> get_skeleton_segmnts() const { return PartitionSolver.skeleton_segments; }
-		std::vector<Segment_2> get_skeleton_centerlines() const { return PartitionSolver.skeleton_centerlines; }
-		std::vector<Segment_2> get_skeleton_otherlines() const { return PartitionSolver.skeleton_otherlines; }
-		std::vector<Polygon_2> get_skeleton_faces() const { return PartitionSolver.skeleton_faces; }
-		std::vector<std::vector<Polygon_2>> get_partition() const{ return PartitionSolver.partition; }
-		std::vector<Polygon_2> get_uncertain_parts() const { return PartitionSolver.uncertain_parts; }
-        std::vector<Segment_2> get_split_segments() const {return PartitionSolver.split_segments; }
-        std::vector<Point_2> get_log_points() const { return PartitionSolver.log_points; }
+        std::vector<Segment_2> get_skeleton_segmnts() const { return PartitionSolver.get_skeleton_segments(); }
+		std::vector<Segment_2> get_skeleton_centerlines() const { return PartitionSolver.get_skeleton_centerlines(); }
+		std::vector<Segment_2> get_skeleton_otherlines() const { return PartitionSolver.get_skeleton_otherlines(); }
+		std::vector<Polygon_2> get_skeleton_faces() const { return PartitionSolver.get_skeleton_faces(); }
+		std::vector<std::vector<Polygon_2>> get_partition() const { return PartitionSolver.get_partition(); }
+		std::vector<Polygon_2> get_uncertain_parts() const { return PartitionSolver.get_uncertain_parts(); }
+        std::vector<Segment_2> get_split_segments() const {return PartitionSolver.get_split_segments(); }
+        std::vector<Point_2> get_log_points() const  { return PartitionSolver.get_log_points(); }
     private:
         Partition::Solver<K> PartitionSolver;
         Placement::Solver<K> PlacementSolver;
@@ -57,7 +57,7 @@ namespace ParitionPlacement
 			throw std::invalid_argument("\'geojson\' is empty!");
         origin_space = GeoJSON::geojson_to_Pwh<K>(geojson);
         PartitionSolver = Partition::Solver<K>(origin_space, partitionProps);
-		polygon = PartitionSolver.polygon;
+		polygon = PartitionSolver.get_polygon();
         PlacementSolver = Placement::Solver<K>(placementProps);
     }
 } // namespace PartitionPlacement
