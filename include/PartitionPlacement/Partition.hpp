@@ -316,9 +316,10 @@ namespace Partition
                     if(visited.find(v) != visited.end())
 						continue;
                     std::unordered_set<Vertex_handle> part;
+                    int part_num = parts.size();
                     part.insert(it);
-                    part.insert(v);
                     visited.insert(it);
+                    part.insert(v);
                     visited.insert(v);
                     auto adj_v = get_adj_centerline_vertex(v);
                     while (adj_v.size() == 2) {
@@ -331,9 +332,12 @@ namespace Partition
                 }
             }
             std::cout << "partition num : " << parts.size() << ", parition edges num : ";
-            for (auto p : parts)
+            int total_partition_edges_num = 0;
+            for (auto p : parts) {
                 std::cout << p.size() << " ";
-            std::cout << std::endl;
+                total_partition_edges_num += p.size();
+            }
+            std::cout << ", sum up: " << total_partition_edges_num << std::endl;
             std::unordered_map < Vertex_handle, std::unordered_set<int>> v2pn;  // vertex 2 part num
             for (int part_num = 0; part_num < parts.size(); ++part_num)
                 for (auto v : parts[part_num])
@@ -354,21 +358,21 @@ namespace Partition
             std::vector<std::unordered_set<Face_handle>> certain_faces(parts.size());     // faces which are certain belong to which part
             std::vector<Face_handle> uncertain_faces;                       // faces which are uncertain belong to which part   
             std::unordered_map<Face_handle, int> face2pn;                   // face 2 part num
-            std::unordered_map<Halfedge_handle, int> he2pn;                 // halfedge which is core he 2 part num
+            std::unordered_map<Halfedge_handle, int> he2pn;
             for (int i = 0; i < parts.size(); i++) {
                 const int& part_num = i;
                 const std::unordered_set<Vertex_handle>& part = parts[i];
-                for(auto& v : part) {
-					Halfedge_handle h = v->halfedge();
-					do {
+                for (auto& v : part) {
+                    Halfedge_handle h = v->halfedge();
+                    do {
                         Vertex_handle from = h->opposite()->vertex(), to = h->vertex();
                         if (part.find(from) != part.end() && part.find(to) != part.end() && he2pn.find(h) == he2pn.end()) {
                             he2pn[h] = part_num;
                             he2pn[h->opposite()] = part_num;
                         }
-						h = h->next()->opposite();
-					} while (h != v->halfedge());
-				}
+                        h = h->next()->opposite();
+                    } while (h != v->halfedge());
+                }
             }
             for (auto it : he2pn) {
                 Halfedge_handle he = it.first;
@@ -545,6 +549,10 @@ namespace Partition
                             cur_h = cur_h->next();
                             cur_v = cur_h->vertex();
                         };
+                        if (he2pn.find(cur_h->opposite()) != he2pn.end())
+                            part_num = he2pn[cur_h->opposite()];
+                        else if (he2pn.find(cur_h) != he2pn.end())
+                            part_num = he2pn[cur_h];
                         Halfedge_handle split_he = decorator.split_face(cur_h, border_edge);
                         face_paint = split_he->face();
                         spare_face = split_he->opposite()->face();
@@ -561,9 +569,15 @@ namespace Partition
                         while (cur_v != B) {
                             if (he2pn.find(cur_h->opposite()) != he2pn.end())
                                 part_num = he2pn[cur_h->opposite()];
+                            else if (he2pn.find(cur_h) != he2pn.end())
+                                part_num = he2pn[cur_h];
                             cur_h = cur_h->next();
                             cur_v = cur_h->vertex();
                         };
+                        if (he2pn.find(cur_h->opposite()) != he2pn.end())
+                            part_num = he2pn[cur_h->opposite()];
+                        else if (he2pn.find(cur_h) != he2pn.end())
+                            part_num = he2pn[cur_h];
                         Halfedge_handle split_he = decorator.split_face(cur_h, end_he);
                         face_paint = split_he->face();
                         spare_face = split_he->opposite()->face();
