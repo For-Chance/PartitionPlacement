@@ -356,7 +356,7 @@ namespace Partition
                 return adj_faces;
                 };
             std::vector<std::unordered_set<Face_handle>> certain_faces(parts.size());     // faces which are certain belong to which part
-            std::vector<Face_handle> uncertain_faces;                       // faces which are uncertain belong to which part   
+            std::unordered_set<Face_handle> uncertain_faces;                       // faces which are uncertain belong to which part   
             std::unordered_map<Face_handle, int> face2pn;                   // face 2 part num
             std::unordered_map<Halfedge_handle, int> he2pn;
             for (int i = 0; i < parts.size(); i++) {
@@ -392,7 +392,7 @@ namespace Partition
                     h = h->next();
                 } while (h != f->halfedge());
                 if (is_uncertain) {
-                    uncertain_faces.push_back(f);
+                    uncertain_faces.insert(f);
 					continue;
                 }
                 q.push(f);
@@ -452,7 +452,7 @@ namespace Partition
                 }
                 return intersection_points.size() == 2;
                 };
-            for (Face_handle& face : uncertain_faces) {
+            for (Face_handle face : uncertain_faces) {
                 Polygon_2 poly = get_Poly_from_Face(face);
                 Halfedge_handle border_edge;
                 struct VAttr {  // vertex attribute
@@ -462,7 +462,7 @@ namespace Partition
                     bool IsIntersect_to_B = false;
                     int ChooseNum() {   // 0: both not, 1: A, 2: B
                         if (IsIntersect_to_A == true && IsIntersect_to_B == true)
-                            return 0;
+                            return dis_to_A < dis_to_B ? -1 : -2;
                         else if (IsIntersect_to_B == true)
                             return 1;
                         else if (IsIntersect_to_A == true)
@@ -473,7 +473,7 @@ namespace Partition
                     int chooseNum;
                     Vertex_handle A, B;
                     bool operator<(const VAttr& other) const {
-                        return chooseNum > other.chooseNum; // 2->1->0
+                        return chooseNum > other.chooseNum; // 2->1->-1->-2
                     }
                 };
                 std::unordered_map<Vertex_handle, VAttr> split_vertexs;
@@ -522,9 +522,9 @@ namespace Partition
                 // get choose num
                 for (auto& it : split_vertexs) {
                     it.second.chooseNum = it.second.ChooseNum();
-                    if (it.second.chooseNum == 1)
+                    if (it.second.chooseNum == 1 || it.second.chooseNum == -1)
                         it.second.A = A;
-                    else if (it.second.chooseNum == 2)
+                    else if (it.second.chooseNum == 2 || it.second.chooseNum == -2)
                         it.second.B = B;
                 }
                 // sort according to choose num, B first, then A, then both not
@@ -532,11 +532,14 @@ namespace Partition
                 std::sort(split_vertexs_vec.begin(), split_vertexs_vec.end());
                 int another_part_num = -1;
                 Face_handle spare_face = face;
+                std::unordered_set<int> except_pns;
+                int split_vertexs_vec_size = split_vertexs_vec.size();
                 for (auto& sv : split_vertexs_vec) {
                     Vertex_handle& split_v = sv.first;
                     VAttr& attr = sv.second;
-                    std::cout << "chooseNum = " << attr.chooseNum << ", dis_to_A = " << attr.dis_to_A << ", dist_to_B = " << attr.dis_to_B << ", IsIntersect_to_A = " << attr.IsIntersect_to_A << ", IsIntersect_to_B = " << attr.IsIntersect_to_B << std::endl;
-                    Face_handle face_paint;
+                    std::cout << "chooseNum = " << attr.chooseNum << ", dis_to_A = " << attr.dis_to_A << ", dist_to_B = " << attr.dis_to_B << ", IsIntersect_to_A = " << attr.IsIntersect_to_A << ", IsIntersect_to_B = " << attr.IsIntersect_to_B << ", split_v = " << split_v->point() << ", border_edge point = " << border_edge->vertex()->point() << std::endl;
+                    std::vector<Face_handle> face_paints;
+                    std::vector<std::pair<Halfedge_handle, Halfedge_handle>> split_segs;
                     int part_num = -1;
                     if (attr.chooseNum == 1) {
                         Halfedge_handle cur_h = border_edge;
@@ -544,7 +547,7 @@ namespace Partition
                         while (cur_v != split_v) {
                             if (he2pn.find(cur_h->opposite()) != he2pn.end())
                                 part_num = he2pn[cur_h->opposite()];
-                            else if(he2pn.find(cur_h) != he2pn.end())
+                            else if (he2pn.find(cur_h) != he2pn.end())
                                 part_num = he2pn[cur_h];
                             cur_h = cur_h->next();
                             cur_v = cur_h->vertex();
@@ -553,9 +556,7 @@ namespace Partition
                             part_num = he2pn[cur_h->opposite()];
                         else if (he2pn.find(cur_h) != he2pn.end())
                             part_num = he2pn[cur_h];
-                        Halfedge_handle split_he = decorator.split_face(cur_h, border_edge);
-                        face_paint = split_he->face();
-                        spare_face = split_he->opposite()->face();
+                        split_segs.push_back(std::make_pair(cur_h, border_edge));
                     }
                     else if (attr.chooseNum == 2) {
                         Vertex_handle B = attr.B;
@@ -578,28 +579,69 @@ namespace Partition
                             part_num = he2pn[cur_h->opposite()];
                         else if (he2pn.find(cur_h) != he2pn.end())
                             part_num = he2pn[cur_h];
-                        Halfedge_handle split_he = decorator.split_face(cur_h, end_he);
-                        face_paint = split_he->face();
-                        spare_face = split_he->opposite()->face();
+                        split_segs.push_back(std::make_pair(cur_h, end_he));
                     }
-                    else {
+                    else if (attr.chooseNum == -1) {
+                        Vertex_handle A = attr.A;
+                        Segment_2 A2sv = Segment_2(A->point(), split_v->point());
+                        Line_2 supp_line = A2sv.supporting_line();
+                        
+                        Halfedge_handle cur_prev_h = border_edge->prev();
+                        while (supp_line.has_on_boundary(cur_prev_h->vertex()->point())) {
+                            cur_prev_h = cur_prev_h->prev();
+                        };
+                        bool RIGHT_DIRECTION = supp_line.has_on_positive_side(cur_prev_h->vertex()->point());
+
+                        Halfedge_handle last_right_he = border_edge;
+                        Halfedge_handle cur_h = border_edge->next();
+                        Vertex_handle cur_v = cur_h->vertex();    // A->next
+                        while (cur_v != split_v) {
+                            if (supp_line.has_on_positive_side(cur_v->point()) == RIGHT_DIRECTION || supp_line.has_on_boundary(cur_v->point())) {
+                                if(last_right_he->next() != cur_h)
+									split_segs.push_back(std::make_pair(cur_h, last_right_he));
+								last_right_he = cur_h;
+                            }
+                            if (he2pn.find(cur_h->opposite()) != he2pn.end())
+                                part_num = he2pn[cur_h->opposite()];
+                            else if (he2pn.find(cur_h) != he2pn.end())
+                                part_num = he2pn[cur_h];
+                            cur_h = cur_h->next();
+                            cur_v = cur_h->vertex();
+                        };
+                        if (last_right_he->next() != cur_h)
+                            split_segs.push_back(std::make_pair(cur_h, last_right_he));
+                    }
+                    else if (attr.chooseNum == -2) {
+                        Vertex_handle B = attr.B;
+                        Segment_2 sv2B = Segment_2(split_v->point(), B->point());
+                        Line_2 supp_line = sv2B.supporting_line();
+
+                        Halfedge_handle cur_next_h = border_edge;
+                        while (supp_line.has_on_boundary(cur_next_h->vertex()->point())) {
+                            cur_next_h = cur_next_h->next();
+                        };
+                        bool RIGHT_DIRECTION = supp_line.has_on_positive_side(cur_next_h->vertex()->point());
+
+                        // TODO 
                         continue;
                     }
-                    // TODO: another part
-                    if (part_num != -1)
-                        Face_partition[part_num].push_back(face_paint);
+                    else
+                        continue;
+                    for (auto it : split_segs) {
+                        Halfedge_handle split_he = decorator.split_face(it.first, it.second);
+                        Face_handle fp = split_he->face();
+                        spare_face = split_he->opposite()->face();
+                        if (part_num != -1) {
+                            except_pns.insert(part_num);
+                            Face_partition[part_num].push_back(fp);
+                        }
+                    }
                 }
                 Halfedge_handle cur_h = spare_face->halfedge();
                 int part_num = -1;
                 do {
-                    if (he2pn.find(cur_h->opposite()) != he2pn.end()) {
-                        if(part_num == -1)
-                            part_num = he2pn[cur_h->opposite()];
-                        else if (part_num != he2pn[cur_h->opposite()]) {
-                            part_num = -1;
-                            break;
-                        }
-                    }
+                    if (he2pn.find(cur_h->opposite()) != he2pn.end() && except_pns.find(he2pn[cur_h->opposite()]) == except_pns.end())
+                        part_num = he2pn[cur_h->opposite()];
 					cur_h = cur_h->next();
 				} while (cur_h != spare_face->halfedge());
                 if(part_num != -1)
