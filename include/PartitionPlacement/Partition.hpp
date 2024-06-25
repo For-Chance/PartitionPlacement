@@ -111,15 +111,16 @@ namespace Partition
         /// <param name="face"></param>
         /// <returns></returns>
         Polygon_2 get_Poly_from_Face(const Face_handle& face) {
-            Polygon_2 poly;
+            std::vector<Point_2> ps;
+            ps.reserve(20);
             Halfedge_handle h = face->halfedge();
             Halfedge_handle first = h;
             do {
                 Point_2 point = h->vertex()->point();
-                poly.push_back(point);
+                ps.push_back(point);
                 h = h->next();
             } while (h != first);
-            return poly;
+            return Polygon_2(ps.begin(), ps.end());
         }
 
         KernelConverter::KernelConverter<K, InnerK, KernelConverter::NumberConverter<typename K::FT, FT>>K2InnerK;
@@ -549,7 +550,7 @@ namespace Partition
                 for (auto& sv : split_vertexs_vec) {
                     Vertex_handle& split_v = sv.first;
                     VAttr& attr = sv.second;
-                    std::cout << "chooseNum = " << attr.chooseNum << ", dis_to_A = " << attr.dis_to_A << ", dist_to_B = " << attr.dis_to_B << ", IsIntersect_to_A = " << attr.IsIntersect_to_A << ", IsIntersect_to_B = " << attr.IsIntersect_to_B << ", split_v = " << split_v->point() << ", border_edge point = " << border_edge->vertex()->point() << std::endl;
+                    //std::cout << "chooseNum = " << attr.chooseNum << ", dis_to_A = " << attr.dis_to_A << ", dist_to_B = " << attr.dis_to_B << ", IsIntersect_to_A = " << attr.IsIntersect_to_A << ", IsIntersect_to_B = " << attr.IsIntersect_to_B << ", split_v = " << split_v->point() << ", border_edge point = " << border_edge->vertex()->point() << std::endl;
                     std::vector<Face_handle> face_paints;
                     std::vector<std::pair<Halfedge_handle, Halfedge_handle>> split_segs;
                     int part_num = -1;
