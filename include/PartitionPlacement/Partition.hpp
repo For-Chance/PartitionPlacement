@@ -359,6 +359,7 @@ namespace Partition
             std::unordered_set<Face_handle> uncertain_faces;                       // faces which are uncertain belong to which part   
             std::unordered_map<Face_handle, int> face2pn;                   // face 2 part num
             std::unordered_map<Halfedge_handle, int> he2pn;
+            std::unordered_set<Halfedge_handle> special_hes;
             for (int i = 0; i < parts.size(); i++) {
                 const int& part_num = i;
                 const std::unordered_set<Vertex_handle>& part = parts[i];
@@ -401,6 +402,10 @@ namespace Partition
                 // the face is certain if there is a leaf vertex
                 if (leaf_vertex.find(he->vertex()) != leaf_vertex.end())
                     q.push(he->next()->opposite()->face());
+
+                // the halfedge is special if both vertex are connect veretex
+                if (connected_vertex.find(he->vertex()) != connected_vertex.end() && connected_vertex.find(he->opposite()->vertex()) != connected_vertex.end())
+                    special_hes.insert(he);
 
                 while(!q.empty()) {
                     Face_handle cur_face = q.front();
@@ -658,6 +663,13 @@ namespace Partition
             for (Face_handle face : temp_convert_faces)
                 uncertain_faces.erase(face);
             temp_convert_faces.clear();
+            for (Halfedge_handle he : special_hes) {
+                int part_num = he2pn[he];
+                Face_handle face = he->face();
+                Face_partition[part_num].push_back(face);
+                if (uncertain_faces.find(face) != uncertain_faces.end())
+                    uncertain_faces.erase(face);
+            }
             this->partition = std::vector<std::vector<Polygon_2>>(Face_partition.size());
             for(int part_num = 0;part_num < Face_partition.size();part_num++)
 				for (const Face_handle& face : Face_partition[part_num])
