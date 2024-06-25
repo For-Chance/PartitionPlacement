@@ -264,13 +264,13 @@ namespace Partition
                 }
                 return adj_vertices[0];
                 };
-            std::vector<Vertex_handle> leaf_vertex;
+            std::unordered_set<Vertex_handle> leaf_vertex;
             for (std::pair<Vertex_handle, bool>& it : he_pool)
                 if(it.second == true)   // is centerline candidate
                     if(centerline_vertex2cnt[it.first] == 1)
-                        leaf_vertex.push_back(it.first);
-            for (int idx = 0; idx < leaf_vertex.size();idx++) {
-                Vertex_handle& cur_v = leaf_vertex[idx];
+                        leaf_vertex.insert(it.first);
+            for (Vertex_handle lv : leaf_vertex) {
+                Vertex_handle& cur_v = lv;
                 log_points.push_back(cur_v->point());
                 bool delete_v = true;
                 do {
@@ -287,7 +287,7 @@ namespace Partition
             leaf_vertex.clear();
 			for (auto& it : centerline_vertex2cnt)
 				if (it.second == 1)
-                    leaf_vertex.push_back(it.first);
+                    leaf_vertex.insert(it.first);
                 else if (it.second == 3)
 					connected_vertex.insert(it.first);
             for (Halfedge_iterator it = this->skeleton->halfedges_begin(); it != this->skeleton->halfedges_end(); ++it) {
@@ -381,6 +381,8 @@ namespace Partition
                 Face_handle f = he->face();
                 if (face2pn.find(f) != face2pn.end())
                     continue;
+
+                // the face is uncertain if there is a connected_vertex in there
                 bool is_uncertain = false;
                 Halfedge_handle h = f->halfedge();
                 do {
@@ -391,11 +393,15 @@ namespace Partition
                     }
                     h = h->next();
                 } while (h != f->halfedge());
-                if (is_uncertain) {
+                if (is_uncertain)
                     uncertain_faces.insert(f);
-					continue;
-                }
-                q.push(f);
+                else
+                    q.push(f);
+
+                // the face is certain if there is a leaf vertex
+                if (leaf_vertex.find(he->vertex()) != leaf_vertex.end())
+                    q.push(he->next()->opposite()->face());
+
                 while(!q.empty()) {
                     Face_handle cur_face = q.front();
                     q.pop();
@@ -452,6 +458,7 @@ namespace Partition
                 }
                 return intersection_points.size() == 2;
                 };
+            std::unordered_set<Face_handle> temp_convert_faces;
             for (Face_handle face : uncertain_faces) {
                 Polygon_2 poly = get_Poly_from_Face(face);
                 Halfedge_handle border_edge;
@@ -632,6 +639,7 @@ namespace Partition
                         Face_handle fp = split_he->face();
                         spare_face = split_he->opposite()->face();
                         if (part_num != -1) {
+                            temp_convert_faces.insert(face);
                             except_pns.insert(part_num);
                             Face_partition[part_num].push_back(fp);
                         }
@@ -647,12 +655,16 @@ namespace Partition
                 if(part_num != -1)
 					Face_partition[part_num].push_back(spare_face);
             }
+            for (Face_handle face : temp_convert_faces)
+                uncertain_faces.erase(face);
+            temp_convert_faces.clear();
             this->partition = std::vector<std::vector<Polygon_2>>(Face_partition.size());
             for(int part_num = 0;part_num < Face_partition.size();part_num++)
 				for (const Face_handle& face : Face_partition[part_num])
                     if(face != nullptr)
 					    this->partition[part_num].push_back(get_Poly_from_Face(face));
-            std::cout << "partition done!" << std::endl;
+            std::cout << "Partition done! uncerteain_faces.size() = " << uncertain_faces.size() << std::endl;
+            
         }
 		else
 			polygon = this->K2InnerK.convert(origin_space);
