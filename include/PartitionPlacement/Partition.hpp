@@ -133,6 +133,7 @@ namespace Partition
         std::vector<Segment_2> skeleton_otherlines;
         std::vector<Polygon_2> skeleton_faces;
         std::vector<std::vector<Polygon_2>> partition;
+        std::vector<Polygon_2> merge_partition;
         std::vector<Polygon_2> uncertain_parts;
         std::vector<Segment_2> split_segments;
         std::vector<Point_2> log_points;
@@ -676,8 +677,13 @@ namespace Partition
 				for (const Face_handle& face : Face_partition[part_num])
                     if(face != nullptr)
 					    this->partition[part_num].push_back(get_Poly_from_Face(face));
+
+            // TODO merge partition
+            for (std::vector<Face_handle>& fs : Face_partition) {
+                
+            }
             std::cout << "Partition done! uncerteain_faces.size() = " << uncertain_faces.size() << std::endl;
-            
+
         }
 		else
 			polygon = this->K2InnerK.convert(origin_space);
