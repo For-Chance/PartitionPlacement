@@ -87,7 +87,7 @@ namespace ParitionPlacement
 		controlProps.withSimplifyBoundary = p["ControlProps"]["withSimplifyBoundary"].asBool();
 		controlProps.showSkeletonFaces = p["ControlProps"]["showSkeletonFaces"].asBool();
         controlProps.showCenterLines = p["ControlProps"]["showCenterLines"].asBool();
-        controlProps.showPartitions = p["ControlProps"]["showCenterLines"].asBool();
+        controlProps.showPartitions = p["ControlProps"]["showPartitions"].asBool();
     }
 
     /// <summary>
