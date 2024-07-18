@@ -7,11 +7,11 @@
         
     },
     "ControlProps": {
-        "InputFile": "../data/sample7.Info.geojson",
+        "InputFile": "../data/sample11.Info.geojson",
         "OutputFile": "",
         "withSimplifyBoundary": false,
         "showSkeletonFaces": false,
-	"showCenterLines": true,
+	"showCenterLines": false,
 	"showPartitions": true
     }
 }
