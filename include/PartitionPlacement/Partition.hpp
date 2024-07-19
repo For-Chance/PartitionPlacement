@@ -703,10 +703,20 @@ namespace Partition
             // 3. merge all non standart parts to standar part
             struct Part {
                 bool is_standard = true;
-                Polygon_2 polygon;
+                Polygon_2 border_polygon;
+                std::unordered_set<Halfedge_handle> border_hes;
+                std::unordered_set<Halfedge_handle> centerline_hes;
+                void check_standard(const std::unordered_set<Halfedge_handle>& outer_centerline_hes) {
+                    for (const Halfedge_handle& he : border_hes)
+                        if (outer_centerline_hes.find(he) != outer_centerline_hes.end()) {
+                            std::cout << he->vertex()->point() << "-" << he->opposite()->vertex()->point();
+                            is_standard = false;
+                            return;
+                        }
+                }
             };
             std::vector<Part> nonstandard_parts;
-            std::cout << "nonstandard parts(face size):";
+            std::cout << "nonstandard parts(face size):" << std::endl;
             for (int part_num = 0; part_num < Face_partition.size(); part_num++) {
                 Part part;
                 std::unordered_set<Face_handle>& faces = Face_partition[part_num];
@@ -714,33 +724,37 @@ namespace Partition
                 auto is_border_he = [&](const Halfedge_handle& cur_h) {
                     return !(cur_h->is_bisector() && he2pn[cur_h] == he2pn[cur_h->opposite()]);
 				};
-                for (const Face_handle& face : faces) {
-                    cur_h = face->halfedge();
-                    do {
+                auto merge_faces = [&](const std::unordered_set<Face_handle>& faces, Polygon_2& result_polygon, std::unordered_set<Halfedge_handle>& result_hes) {
+                    result_hes.clear();
+                    for (const Face_handle& face : faces) {
+                        cur_h = face->halfedge();
+                        do {
+                            if (is_border_he(cur_h))
+                                break;
+                            cur_h = cur_h->next();
+                        } while (cur_h != face->halfedge());
                         if (is_border_he(cur_h))
                             break;
+                    }
+                    std::vector<Point_2> points;
+                    Halfedge_handle start_h = cur_h;
+                    do {
+                        result_hes.insert(cur_h);
+                        points.push_back(cur_h->vertex()->point());
                         cur_h = cur_h->next();
-                    } while (cur_h != face->halfedge());
-                    if (is_border_he(cur_h))
-                        break;
-                }
-                std::vector<Point_2> points;
-                Halfedge_handle start_h = cur_h;
-                do {
-                    if (centerline_hes.find(cur_h) != centerline_hes.end())
-                        part.is_standard = false;
-                    points.push_back(cur_h->vertex()->point());
-                    cur_h = cur_h->next();
-                    while (!is_border_he(cur_h)) {
-                        cur_h = cur_h->opposite()->next();
+                        while (!is_border_he(cur_h)) {
+                            cur_h = cur_h->opposite()->next();
+                        };
+                    } while (cur_h != start_h);
+                    result_polygon = Polygon_2(points.begin(), points.end());
                     };
-                }while(cur_h != start_h);
-                part.polygon = Polygon_2(points.begin(), points.end());
+                merge_faces(faces, part.border_polygon, part.border_hes);
+                part.check_standard(centerline_hes);
                 if (!part.is_standard) {
                     nonstandard_parts.push_back(part);
-                    std::cout << " " << part_num << "(" << faces.size() << ")";
+                    std::cout << " " << part_num << "(face_size = " << faces.size() << ", centerline_size = " << part.centerline_hes.size() << ")" << std::endl;
                 }
-                this->partition[part_num] = { part.polygon };   // override the partition
+                this->partition[part_num] = { part.border_polygon };   // override the partition
             }
             std::cout << std::endl;
         }

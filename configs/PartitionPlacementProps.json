@@ -11,7 +11,7 @@
         "OutputFile": "",
         "withSimplifyBoundary": false,
         "showSkeletonFaces": false,
-	"showCenterLines": false,
+	"showCenterLines": true,
 	"showPartitions": true
     }
 }
