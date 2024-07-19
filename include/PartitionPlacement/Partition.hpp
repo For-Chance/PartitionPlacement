@@ -311,7 +311,7 @@ namespace Partition
 
             // 4. partition
             // 4.1 init partition according to connected vertex
-            std::vector<std::vector<Face_handle>> Face_partition;
+            std::vector<std::unordered_set<Face_handle>> Face_partition;
             std::vector<std::unordered_set<Vertex_handle>> parts;
             std::unordered_set<Vertex_handle> visited; 
             for (Vertex_handle it : connected_vertex) {
@@ -347,7 +347,7 @@ namespace Partition
             for (int part_num = 0; part_num < parts.size(); ++part_num)
                 for (auto v : parts[part_num])
                     v2pn[v].insert(part_num);
-            Face_partition = std::vector<std::vector<Face_handle>>(parts.size());
+            Face_partition = std::vector<std::unordered_set<Face_handle>>(parts.size());
 
             // 4.2 find certain faces and uncertain faces
             auto get_adj_faces = [&](const Face_handle& face) {
@@ -417,7 +417,7 @@ namespace Partition
                     q.pop();
                     certain_faces[part_num].insert(cur_face);
                     face2pn[cur_face] = part_num;
-                    Face_partition[part_num].push_back(cur_face);
+                    Face_partition[part_num].insert(cur_face);
                     std::vector<Face_handle>& adj_faces = get_adj_faces(cur_face);
                     for(auto& adj_face : adj_faces) {
                         bool is_same_part = true;
@@ -651,7 +651,7 @@ namespace Partition
                         if (part_num != -1) {
                             temp_convert_faces.insert(face);
                             except_pns.insert(part_num);
-                            Face_partition[part_num].push_back(fp);
+                            Face_partition[part_num].insert(fp);
                             Halfedge_handle cur_h = fp->halfedge();
                             do {
                                 he2pn[cur_h] = part_num;
@@ -668,7 +668,7 @@ namespace Partition
 					cur_h = cur_h->next();
 				} while (cur_h != spare_face->halfedge());
                 if (part_num != -1) {
-                    Face_partition[part_num].push_back(spare_face);
+                    Face_partition[part_num].insert(spare_face);
                     Halfedge_handle cur_h = spare_face->halfedge();
                     do {
 						he2pn[cur_h] = part_num;
@@ -682,7 +682,7 @@ namespace Partition
             for (Halfedge_handle he : special_hes) {
                 int part_num = he2pn[he];
                 Face_handle face = he->face();
-                Face_partition[part_num].push_back(face);
+                Face_partition[part_num].insert(face);
                 Halfedge_handle cur_h = face->halfedge();
                 do {
 					he2pn[cur_h] = part_num;
@@ -706,18 +706,22 @@ namespace Partition
                 Polygon_2 polygon;
             };
             std::vector<Part> nonstandard_parts;
+            std::cout << "nonstandard parts(face size):";
             for (int part_num = 0; part_num < Face_partition.size(); part_num++) {
                 Part part;
-                std::vector<Face_handle>& faces = Face_partition[part_num];
+                std::unordered_set<Face_handle>& faces = Face_partition[part_num];
                 Halfedge_handle cur_h;
-                for (Face_handle& face : faces) {
+                auto is_border_he = [&](const Halfedge_handle& cur_h) {
+                    return !(cur_h->is_bisector() && he2pn[cur_h] == he2pn[cur_h->opposite()]);
+				};
+                for (const Face_handle& face : faces) {
                     cur_h = face->halfedge();
                     do {
-                        if (!cur_h->is_bisector())
+                        if (is_border_he(cur_h))
                             break;
                         cur_h = cur_h->next();
                     } while (cur_h != face->halfedge());
-                    if (!cur_h->is_bisector())
+                    if (is_border_he(cur_h))
                         break;
                 }
                 std::vector<Point_2> points;
@@ -727,16 +731,18 @@ namespace Partition
                         part.is_standard = false;
                     points.push_back(cur_h->vertex()->point());
                     cur_h = cur_h->next();
-                    while (cur_h->is_bisector() && he2pn[cur_h] == he2pn[cur_h->opposite()]) {
+                    while (!is_border_he(cur_h)) {
                         cur_h = cur_h->opposite()->next();
                     };
                 }while(cur_h != start_h);
                 part.polygon = Polygon_2(points.begin(), points.end());
-                if (!part.is_standard)
+                if (!part.is_standard) {
                     nonstandard_parts.push_back(part);
+                    std::cout << " " << part_num << "(" << faces.size() << ")";
+                }
                 this->partition[part_num] = { part.polygon };   // override the partition
             }
-            std::cout << "number of nonstandard parts: " << nonstandard_parts.size() << std::endl;
+            std::cout << std::endl;
         }
 		else
 			polygon = this->K2InnerK.convert(origin_space);

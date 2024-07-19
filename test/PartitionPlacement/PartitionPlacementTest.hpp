@@ -138,9 +138,21 @@ namespace ParitionPlacement
         if (controlProps.showPartitions) {
             /*mainwindow.drawPartitions(PolyParts_holes, Segment_Color, Holes_Color, Point_Color);
             mainwindow.drawPartitions(PolyParts_outer, Segment_Color, Room_Color, Point_Color);*/
-            for (auto part : partition) {
+            
+            for (int part_num = 0; part_num < partition.size();part_num++) {
+                const std::vector<Polygon_2>& part = partition[part_num];
 				CGAL::Color part_Color(rand() % 255, rand() % 255, rand() % 255);
                 mainwindow.drawPartitions(part, Segment_Color, part_Color, Point_Color);
+                // draw part_num in the center of the partition
+                Point_2 center(0, 0);
+                int vertex_num = 0;
+                for (const Polygon_2& poly : part)
+                    for (const Point_2& it : poly.vertices()) {
+                        vertex_num++;
+                        center = Point_2(center.x() + it.x(), center.y() + it.y());
+                    }
+                center = Point_2(center.x() / vertex_num, center.y() / vertex_num);
+				mainwindow.drawText(center, QString::number(part_num));
             }
 			mainwindow.drawPartitions(uncertain_parts, Segment_Color, Room_Color, Point_Color);
             mainwindow.drawSegments(split_segments, SplitSeg_Color);
