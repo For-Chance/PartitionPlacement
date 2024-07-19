@@ -229,9 +229,7 @@ namespace Partition
                         FT squared_cos_theta = (inner * inner) / absolute_scale;
                         bool is_ans = !(equal(v_la.x(), v_rb.x()) && equal(v_la.y(), v_rb.y()) && squared_cos_theta >= MIN_SQUARED_COS_THETA && inner >= 0);
                         if(is_ans)
-                        {  // centerline candidate
-                            centerline_hes.insert(it);
-                            centerline_hes.insert(it->opposite());
+                        {  
                             centerline_vertex2cnt[from] += 1;
                             centerline_vertex2cnt[to] += 1;
                             bool is_stop = inner < 0 && squared_cos_theta >= MIN_SQUARED_COS_THETA;
@@ -301,8 +299,11 @@ namespace Partition
                     if (from->id() < to->id()) {
                         if (from->time() > to->time())
                             swap(from, to);
-                        if (centerline_vertex2cnt.find(from) != centerline_vertex2cnt.end() && centerline_vertex2cnt.find(to) != centerline_vertex2cnt.end())   // centerline
+                        if (centerline_vertex2cnt.find(from) != centerline_vertex2cnt.end() && centerline_vertex2cnt.find(to) != centerline_vertex2cnt.end()) {   // centerline
                             this->skeleton_centerlines.push_back(Segment_2(from->point(), to->point()));
+                            centerline_hes.insert(it);
+                            centerline_hes.insert(it->opposite());
+                        }
                         else
                             this->skeleton_otherlines.push_back(Segment_2(from->point(), to->point()));
                     }
@@ -700,7 +701,6 @@ namespace Partition
 
             // 1. try merge all faces to one face so that we can get the big Polygon_2 of a part
             // 2. make sure whether is standard part for a part
-            // 3. merge all non standart parts to standar part
             struct Part {
                 bool is_standard = true;
                 Polygon_2 border_polygon;
@@ -709,9 +709,8 @@ namespace Partition
                 void check_standard(const std::unordered_set<Halfedge_handle>& outer_centerline_hes) {
                     for (const Halfedge_handle& he : border_hes)
                         if (outer_centerline_hes.find(he) != outer_centerline_hes.end()) {
-                            std::cout << he->vertex()->point() << "-" << he->opposite()->vertex()->point();
                             is_standard = false;
-                            return;
+                            centerline_hes.insert(he);
                         }
                 }
             };
@@ -752,11 +751,11 @@ namespace Partition
                 part.check_standard(centerline_hes);
                 if (!part.is_standard) {
                     nonstandard_parts.push_back(part);
-                    std::cout << " " << part_num << "(face_size = " << faces.size() << ", centerline_size = " << part.centerline_hes.size() << ")" << std::endl;
+                    std::cout << part_num << "(face_size = " << faces.size() << ", centerline_size = " << part.centerline_hes.size() << ")" << std::endl;
                 }
                 this->partition[part_num] = { part.border_polygon };   // override the partition
             }
-            std::cout << std::endl;
+            // 3. merge all non standart parts to standar part
         }
 		else
 			polygon = this->K2InnerK.convert(origin_space);
