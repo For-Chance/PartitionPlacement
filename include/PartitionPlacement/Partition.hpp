@@ -706,15 +706,18 @@ namespace Partition
                 Polygon_2 border_polygon;
                 std::unordered_set<Halfedge_handle> border_hes;
                 std::unordered_set<Halfedge_handle> centerline_hes;
-                void check_standard(const std::unordered_set<Halfedge_handle>& outer_centerline_hes) {
+                std::unordered_set<int> neibor_nonstandard_pns; // neibor nonstandard part num, include itself
+                void check_standard(const std::unordered_set<Halfedge_handle>& outer_centerline_hes, const std::unordered_map<Halfedge_handle, int>& he2pn) {
                     for (const Halfedge_handle& he : border_hes)
                         if (outer_centerline_hes.find(he) != outer_centerline_hes.end()) {
                             is_standard = false;
                             centerline_hes.insert(he);
+                            neibor_nonstandard_pns.insert(he2pn[he]);
+                            neibor_nonstandard_pns.insert(he2pn[he->opposite()]);
                         }
                 }
             };
-            std::vector<Part> nonstandard_parts;
+            std::unordered_map<int, Part> pn2nonstandard_part;
             std::cout << "nonstandard parts(face size):" << std::endl;
             for (int part_num = 0; part_num < Face_partition.size(); part_num++) {
                 Part part;
@@ -750,12 +753,20 @@ namespace Partition
                 merge_faces(faces, part.border_polygon, part.border_hes);
                 part.check_standard(centerline_hes);
                 if (!part.is_standard) {
-                    nonstandard_parts.push_back(part);
+                    pn2nonstandard_part[part_num] = part;
                     std::cout << part_num << "(face_size = " << faces.size() << ", centerline_size = " << part.centerline_hes.size() << ")" << std::endl;
                 }
                 this->partition[part_num] = { part.border_polygon };   // override the partition
             }
             // 3. merge all non standart parts to standar part
+            // find the set of neibor nonstandard parts 
+            // TODO 并查集找连通子图
+            std::vector<std::unordered_set<int>> nonstandard_neibor_pn_set; // 
+            for (auto it : pn2nonstandard_part) {
+                const int& part_num = it.first;
+                const Part& part = it.second;
+                
+            }
         }
 		else
 			polygon = this->K2InnerK.convert(origin_space);
