@@ -559,7 +559,64 @@ namespace Partition
                     std::vector<Face_handle> face_paints;
                     std::vector<std::pair<Halfedge_handle, Halfedge_handle>> split_segs;
                     int part_num = -1;
-                    if (attr.chooseNum == 1) {
+
+                    auto check_loop_next = [&](Halfedge_handle& start_he, const Line_2& supp_line) {
+                        // skip the point on supporting_line, find the first point not on the line
+                        Halfedge_handle cur_prev_h = start_he->prev();
+                        while (supp_line.has_on_boundary(cur_prev_h->vertex()->point())) {
+                            cur_prev_h = cur_prev_h->prev();
+                        };
+                        bool RIGHT_DIRECTION = supp_line.has_on_positive_side(cur_prev_h->vertex()->point());
+
+                        Halfedge_handle last_right_he = start_he;
+                        Halfedge_handle cur_h = start_he->next();
+                        Vertex_handle cur_v = cur_h->vertex();    // A->next
+                        while (cur_v != split_v) {
+                            if (supp_line.has_on_positive_side(cur_v->point()) == RIGHT_DIRECTION || supp_line.has_on_boundary(cur_v->point())) {
+                                if (last_right_he->next() != cur_h)
+                                    split_segs.push_back(std::make_pair(cur_h, last_right_he));
+                                last_right_he = cur_h;
+                            }
+                            if (he2pn.find(cur_h->opposite()) != he2pn.end())
+                                part_num = he2pn[cur_h->opposite()];
+                            else if (he2pn.find(cur_h) != he2pn.end())
+                                part_num = he2pn[cur_h];
+                            cur_h = cur_h->next();
+                            cur_v = cur_h->vertex();
+                        };
+                        if (last_right_he->next() != cur_h)
+                            split_segs.push_back(std::make_pair(cur_h, last_right_he));
+                        return last_right_he != start_he;
+                        };
+                    auto check_loop_prev = [&](Halfedge_handle& start_he, const Line_2& supp_line) {
+                        Halfedge_handle cur_next_h = start_he->next();
+                        while (supp_line.has_on_boundary(cur_next_h->vertex()->point())) {
+                            cur_next_h = cur_next_h->next();
+                        };
+                        bool RIGHT_DIRECTION = supp_line.has_on_positive_side(cur_next_h->vertex()->point());
+
+                        Halfedge_handle last_right_he = start_he;
+                        Halfedge_handle cur_h = last_right_he->prev();
+                        Vertex_handle cur_v = cur_h->vertex();    // B->prev
+                        while (cur_v != split_v) {
+                            if (supp_line.has_on_positive_side(cur_v->point()) == RIGHT_DIRECTION || supp_line.has_on_boundary(cur_v->point())) {
+                                if (last_right_he->prev() != cur_h)
+                                    split_segs.push_back(std::make_pair(cur_h, last_right_he));
+                                last_right_he = cur_h;
+                            }
+                            if (he2pn.find(cur_h->opposite()) != he2pn.end())
+                                part_num = he2pn[cur_h->opposite()];
+                            else if (he2pn.find(cur_h) != he2pn.end())
+                                part_num = he2pn[cur_h];
+                            cur_h = cur_h->prev();
+                            cur_v = cur_h->vertex();
+                        };
+                        if (last_right_he != start_he && last_right_he->prev() != cur_h)
+                            split_segs.push_back(std::make_pair(cur_h, last_right_he));
+                        return last_right_he != start_he;
+                        };
+
+                    if (attr.chooseNum == 1) {  // choose A
                         Halfedge_handle cur_h = border_edge;
                         Vertex_handle cur_v = border_edge->vertex();
                         while (cur_v != split_v) {
@@ -576,7 +633,7 @@ namespace Partition
                             part_num = he2pn[cur_h];
                         split_segs.push_back(std::make_pair(cur_h, border_edge));
                     }
-                    else if (attr.chooseNum == 2) {
+                    else if (attr.chooseNum == 2) {  // choose B
                         Vertex_handle B = attr.B;
                         Halfedge_handle cur_h = border_edge;
                         Vertex_handle cur_v = border_edge->vertex();
@@ -599,49 +656,25 @@ namespace Partition
                             part_num = he2pn[cur_h];
                         split_segs.push_back(std::make_pair(cur_h, end_he));
                     }
-                    else if (attr.chooseNum == -1) {
+                    else if (attr.chooseNum == -1) {    // choose A but there is intersection
                         Vertex_handle A = attr.A;
                         Segment_2 A2sv = Segment_2(A->point(), split_v->point());
                         Line_2 supp_line = A2sv.supporting_line();
                         
-                        Halfedge_handle cur_prev_h = border_edge->prev();
-                        while (supp_line.has_on_boundary(cur_prev_h->vertex()->point())) {
-                            cur_prev_h = cur_prev_h->prev();
-                        };
-                        bool RIGHT_DIRECTION = supp_line.has_on_positive_side(cur_prev_h->vertex()->point());
-
-                        Halfedge_handle last_right_he = border_edge;
-                        Halfedge_handle cur_h = border_edge->next();
-                        Vertex_handle cur_v = cur_h->vertex();    // A->next
-                        while (cur_v != split_v) {
-                            if (supp_line.has_on_positive_side(cur_v->point()) == RIGHT_DIRECTION || supp_line.has_on_boundary(cur_v->point())) {
-                                if(last_right_he->next() != cur_h)
-									split_segs.push_back(std::make_pair(cur_h, last_right_he));
-								last_right_he = cur_h;
-                            }
-                            if (he2pn.find(cur_h->opposite()) != he2pn.end())
-                                part_num = he2pn[cur_h->opposite()];
-                            else if (he2pn.find(cur_h) != he2pn.end())
-                                part_num = he2pn[cur_h];
-                            cur_h = cur_h->next();
-                            cur_v = cur_h->vertex();
-                        };
-                        if (last_right_he->next() != cur_h)
-                            split_segs.push_back(std::make_pair(cur_h, last_right_he));
+                        Halfedge_handle start_he = border_edge;
+                        bool is_loop_next_intersection = check_loop_next(start_he, supp_line);
+                        if(!is_loop_next_intersection)
+                            bool is_loop_prev_intersection = check_loop_prev(start_he, supp_line);
                     }
-                    else if (attr.chooseNum == -2) {
+                    else if (attr.chooseNum == -2) {    // choose B but there is intersection
                         Vertex_handle B = attr.B;
                         Segment_2 sv2B = Segment_2(split_v->point(), B->point());
                         Line_2 supp_line = sv2B.supporting_line();
 
-                        Halfedge_handle cur_next_h = border_edge;
-                        while (supp_line.has_on_boundary(cur_next_h->vertex()->point())) {
-                            cur_next_h = cur_next_h->next();
-                        };
-                        bool RIGHT_DIRECTION = supp_line.has_on_positive_side(cur_next_h->vertex()->point());
-
-                        // TODO 
-                        continue;
+                        Halfedge_handle start_he = border_edge->prev();
+                        bool is_loop_prev_intersection = check_loop_prev(start_he, supp_line);
+                        if(!is_loop_prev_intersection)
+                            bool is_loop_next_intersection = check_loop_next(start_he, supp_line);
                     }
                     else
                         continue;
