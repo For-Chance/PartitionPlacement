@@ -256,6 +256,17 @@ namespace Partition
                 } while (h != v->halfedge());
                 return adj_vertex;
                 };
+            auto get_adj_centerline_halfedge = [&](Vertex_handle v) {
+                std::vector<Halfedge_handle> adj_hes;
+                Halfedge_handle h = v->halfedge();
+                do {
+                    Halfedge_handle adj_h = h->opposite();
+                    if (h->is_bisector() && centerline_vertex2cnt.find(adj_h->vertex()) != centerline_vertex2cnt.end())
+                        adj_hes.push_back(adj_h);
+                    h = h->next()->opposite();
+                } while (h != v->halfedge());
+                return adj_hes;
+                };
             auto get_ans_num = [&](Vertex_handle v) {
                 return get_adj_centerline_vertex(v).size();
                 };
@@ -314,25 +325,32 @@ namespace Partition
             // 4.1 init partition according to connected vertex
             std::vector<std::unordered_set<Face_handle>> Face_partition;
             std::vector<std::unordered_set<Vertex_handle>> parts;
-            std::unordered_set<Vertex_handle> visited; 
+            std::unordered_set<Halfedge_handle> special_hes;
+            std::unordered_set<Halfedge_handle> visited; 
             for (Vertex_handle it : connected_vertex) {
-                std::vector<Vertex_handle> adj_vertex = get_adj_centerline_vertex(it);
-                //std::cout << adj_vertex.size() << " ";
-                for (auto v : adj_vertex) { 
-                    if(visited.find(v) != visited.end())
-						continue;
+                std::vector<Halfedge_handle>& adj_hes = get_adj_centerline_halfedge(it);
+                for (auto he : adj_hes) {
+                    if (visited.find(he) != visited.end())
+                        continue;
+                    Vertex_handle v = he->vertex();
                     std::unordered_set<Vertex_handle> part;
                     int part_num = parts.size();
+                    visited.insert(he);
+                    visited.insert(he->opposite());
                     part.insert(it);
-                    visited.insert(it);
                     part.insert(v);
-                    visited.insert(v);
-                    auto adj_v = get_adj_centerline_vertex(v);
-                    while (adj_v.size() == 2) {
-                        auto next_v = (part.find(adj_v[0]) == part.end()) ? adj_v[0] : adj_v[1];
+                    auto adj_next_hes = get_adj_centerline_halfedge(v);
+                    while (adj_next_hes.size() == 2) {
+                        Halfedge_handle next_hes = (part.find(adj_next_hes[0]->vertex()) == part.end()) ? adj_next_hes[0] : adj_next_hes[1];
+                        visited.insert(next_hes);
+                        visited.insert(next_hes->opposite());
+                        Vertex_handle next_v = next_hes->vertex();
                         part.insert(next_v);
-                        visited.insert(next_v);
-						adj_v = get_adj_centerline_vertex(next_v);
+                        adj_next_hes = get_adj_centerline_halfedge(next_v);
+                    }
+                    if (part.size() == 2 && connected_vertex.find(v) != connected_vertex.end()) {
+                        special_hes.insert(he);
+                        special_hes.insert(he->opposite());
                     }
                     parts.push_back(part);
                 }
@@ -365,7 +383,6 @@ namespace Partition
             std::unordered_set<Face_handle> uncertain_faces;                       // faces which are uncertain belong to which part   
             std::unordered_map<Face_handle, int> face2pn;                   // face 2 part num
             std::unordered_map<Halfedge_handle, int> he2pn;
-            std::unordered_set<Halfedge_handle> special_hes;
             for (int i = 0; i < parts.size(); i++) {
                 const int& part_num = i;
                 const std::unordered_set<Vertex_handle>& part = parts[i];
@@ -384,6 +401,7 @@ namespace Partition
             for (auto it : he2pn) {
                 Halfedge_handle he = it.first;
                 int part_num = it.second;
+
                 std::queue<Face_handle> q;
                 Face_handle f = he->face();
                 if (face2pn.find(f) != face2pn.end())
@@ -408,10 +426,6 @@ namespace Partition
                 // the face is certain if there is a leaf vertex
                 if (leaf_vertex.find(he->vertex()) != leaf_vertex.end())
                     q.push(he->next()->opposite()->face());
-
-                // the halfedge is special if both vertex are connect veretex
-                if (connected_vertex.find(he->vertex()) != connected_vertex.end() && connected_vertex.find(he->opposite()->vertex()) != connected_vertex.end())
-                    special_hes.insert(he);
 
                 while(!q.empty()) {
                     Face_handle cur_face = q.front();
@@ -713,6 +727,7 @@ namespace Partition
             for (Face_handle face : temp_convert_faces)
                 uncertain_faces.erase(face);
             temp_convert_faces.clear();
+            //std::cout << "special_hes.size() = " << special_hes.size() << std::endl;
             for (Halfedge_handle he : special_hes) {
                 int part_num = he2pn[he];
                 Face_handle face = he->face();
