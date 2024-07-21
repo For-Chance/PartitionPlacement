@@ -342,6 +342,8 @@ namespace Partition
                     auto adj_next_hes = get_adj_centerline_halfedge(v);
                     while (adj_next_hes.size() == 2) {
                         Halfedge_handle next_hes = (part.find(adj_next_hes[0]->vertex()) == part.end()) ? adj_next_hes[0] : adj_next_hes[1];
+                        if(visited.find(next_hes) != visited.end())
+							break;
                         visited.insert(next_hes);
                         visited.insert(next_hes->opposite());
                         Vertex_handle next_v = next_hes->vertex();
@@ -370,11 +372,11 @@ namespace Partition
 
             // 4.2 find certain faces and uncertain faces
             auto get_adj_faces = [&](const Face_handle& face) {
-                std::vector<Face_handle> adj_faces;
+                std::unordered_set<Face_handle> adj_faces;
                 Halfedge_handle h = face->halfedge();
                 do {
                     if (h->is_bisector())
-                        adj_faces.push_back(h->opposite()->face());
+                        adj_faces.insert(h->opposite()->face());
                     h = h->next();
                 } while (h != face->halfedge());
                 return adj_faces;
@@ -403,6 +405,7 @@ namespace Partition
                 int part_num = it.second;
 
                 std::queue<Face_handle> q;
+                std::unordered_set<Face_handle> q_set;  // make sure the face in the queue is unique, otherwise it will be endless loop
                 Face_handle f = he->face();
                 if (face2pn.find(f) != face2pn.end())
                     continue;
@@ -420,20 +423,27 @@ namespace Partition
                 } while (h != f->halfedge());
                 if (is_uncertain)
                     uncertain_faces.insert(f);
-                else
+                else {
                     q.push(f);
+                    q_set.insert(f);
+                }
 
                 // the face is certain if there is a leaf vertex
-                if (leaf_vertex.find(he->vertex()) != leaf_vertex.end())
-                    q.push(he->next()->opposite()->face());
+                if (leaf_vertex.find(he->vertex()) != leaf_vertex.end()) {
+                    Face_handle f = he->next()->opposite()->face();
+                    q.push(f);
+                    q_set.insert(f);
+                }
 
                 while(!q.empty()) {
                     Face_handle cur_face = q.front();
                     q.pop();
+                    q_set.erase(cur_face);
                     certain_faces[part_num].insert(cur_face);
                     face2pn[cur_face] = part_num;
                     Face_partition[part_num].insert(cur_face);
-                    std::vector<Face_handle>& adj_faces = get_adj_faces(cur_face);
+                    std::unordered_set<Face_handle>& adj_faces = get_adj_faces(cur_face);
+                    //std::cout << "adj_faces.size() = " << adj_faces.size() << std::endl;
                     for(auto& adj_face : adj_faces) {
                         bool is_same_part = true;
 						Halfedge_handle h = adj_face->halfedge();
@@ -445,8 +455,10 @@ namespace Partition
                             }
                             h = h->next();
                         } while (h != adj_face->halfedge());
-                        if(is_same_part && face2pn.find(adj_face) == face2pn.end())
-							q.push(adj_face);
+                        if (is_same_part && face2pn.find(adj_face) == face2pn.end() && q_set.find(adj_face) == q_set.end()) {
+                            q.push(adj_face);
+                            q_set.insert(adj_face);
+                        }
 					}
                 }
             }
@@ -459,6 +471,7 @@ namespace Partition
                         he2pn[cur_h] = part_num;
                         cur_h = cur_h->next();
                     } while (cur_h != face->halfedge());
+
                 }
 
             // spilit uncertain faces
@@ -505,7 +518,15 @@ namespace Partition
                     int chooseNum;
                     Vertex_handle A, B;
                     bool operator<(const VAttr& other) const {
-                        return chooseNum > other.chooseNum; // 2->1->-1->-2
+                        if(chooseNum != other.chooseNum)
+							return chooseNum > other.chooseNum; // 2->1->-1->-2
+                        // ChooseNum == other.ChooseNum, make shortest distance first
+                        if(chooseNum == 1 || chooseNum == -1) 
+                            return dis_to_A != other.dis_to_A ? dis_to_A < other.dis_to_A : dis_to_B < other.dis_to_B;
+						else if (chooseNum == 2 || chooseNum == -2) 
+                            return dis_to_B != other.dis_to_B ? dis_to_B < other.dis_to_B : dis_to_A < other.dis_to_A;
+						else
+							throw std::runtime_error("ERROR! Choose nothing!");
                     }
                 };
                 std::unordered_map<Vertex_handle, VAttr> split_vertexs;
@@ -561,7 +582,9 @@ namespace Partition
                 }
                 // sort according to choose num, B first, then A, then both not
                 std::vector<std::pair<Vertex_handle, VAttr>> split_vertexs_vec(split_vertexs.begin(), split_vertexs.end());
-                std::sort(split_vertexs_vec.begin(), split_vertexs_vec.end());
+                std::sort(split_vertexs_vec.begin(), split_vertexs_vec.end(), [](const std::pair<Vertex_handle, VAttr>& va1, const std::pair<Vertex_handle, VAttr>& va2) {
+                    return va1.second < va2.second;
+                    });
                 int another_part_num = -1;
                 Face_handle spare_face = face;
                 std::unordered_set<int> except_pns;
@@ -631,6 +654,7 @@ namespace Partition
                         };
 
                     if (attr.chooseNum == 1) {  // choose A
+                        Vertex_handle A = attr.A;   // A == border_edge->vertex()
                         Halfedge_handle cur_h = border_edge;
                         Vertex_handle cur_v = border_edge->vertex();
                         while (cur_v != split_v) {
@@ -770,6 +794,10 @@ namespace Partition
             for (int part_num = 0; part_num < Face_partition.size(); part_num++) {
                 Part part;
                 std::unordered_set<Face_handle>& faces = Face_partition[part_num];
+                if (faces.size() == 0) {
+                    std::cout << "empty part!, part_num == " << part_num << std::endl;
+                    continue;
+                }
                 Halfedge_handle cur_h;
                 auto is_border_he = [&](const Halfedge_handle& cur_h) {
                     return !(cur_h->is_bisector() && he2pn[cur_h] == he2pn[cur_h->opposite()]);
