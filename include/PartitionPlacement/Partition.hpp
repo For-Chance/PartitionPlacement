@@ -588,11 +588,11 @@ namespace Partition
 				Face_handle spare_face = face;
 				std::unordered_set<int> split_hes_pns;
 				for (auto& sv : split_hes_vec) {
-					Halfedge_handle& split_he = sv.first;
+					Halfedge_handle split_he = sv.first;
 					split_hes_pns.insert(he2pn[split_he]);
 					split_hes_pns.insert(he2pn[split_he->next()]);
 					int shp_size = split_hes_pns.size();
-					Vertex_handle& split_v = split_he->vertex();
+					Vertex_handle split_v = split_he->vertex();
 					VAttr& attr = sv.second;
 					//std::cout << "chooseNum = " << attr.chooseNum << ", dis_to_A = " << attr.dis_to_A << ", dist_to_B = " << attr.dis_to_B << ", IsIntersect_to_A = " << attr.IsIntersect_to_A << ", IsIntersect_to_B = " << attr.IsIntersect_to_B << ", split_v = " << split_v->point() << ", border_edge point = " << border_edge->vertex()->point() << std::endl;
 					std::vector<Face_handle> face_paints;
@@ -621,7 +621,7 @@ namespace Partition
 						};
 						if (last_right_he->next() != cur_h)
 							split_segs.push_back(std::make_pair(cur_h, last_right_he));
-						return last_right_he != start_he;
+						return last_right_he != start_he;	// true is intersection, false is no intersection
 						};
 					auto check_loop_prev = [&](Halfedge_handle& start_he, const Line_2& supp_line) {
 						Halfedge_handle cur_next_h = start_he->next();
@@ -649,6 +649,7 @@ namespace Partition
 
 					if (attr.chooseNum == 1) {  // choose A
 						part_num = he2pn[split_he];
+						std::cout << split_v->point() << std::endl;
 						split_segs.push_back(std::make_pair(split_he, border_edge));
 					}
 					else if (attr.chooseNum == 2) {  // choose B
@@ -662,6 +663,7 @@ namespace Partition
 						Line_2 supp_line = A2sv.supporting_line();
 
 						Halfedge_handle start_he = border_edge;
+						std::cout << split_v->point() << std::endl;
 						bool is_loop_next_intersection = check_loop_next(start_he, supp_line);
 						if (!is_loop_next_intersection)
 							bool is_loop_prev_intersection = check_loop_prev(start_he, supp_line);
