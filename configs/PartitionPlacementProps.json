@@ -1,17 +1,15 @@
 {
-    "PartitionProps": {
-        "withSimplifyBoundary": true,
-	"simplify_order": "0"
-    },
-    "PlacementProps": {
-        
-    },
-    "ControlProps": {
-        "InputFile": "../data/sample11.Info.geojson",
-        "OutputFile": "",
-        "withSimplifyBoundary": false,
-        "showSkeletonFaces": false,
-	"showCenterLines": true,
-	"showPartitions": true
-    }
+  "PartitionProps": {
+    "withSimplifyBoundary": true,
+    "simplify_order": "0"
+  },
+  "PlacementProps": {},
+  "ControlProps": {
+    "InputFile": "../data/sample11.Info.geojson",
+    "OutputFile": "",
+    "withSimplifyBoundary": false,
+    "showSkeletonFaces": false,
+    "showCenterLines": true,
+    "showPartitions": true
+  }
 }
