@@ -848,6 +848,68 @@ namespace Partition
 					std::cout << pn << " ";
 				}
                 std::cout << ")";
+                nonstandard_parts_set.push_back(part.adjacent_nonstandard_part);
+            }
+            std::cout << std::endl;
+            auto dfs = [&](int node, std::unordered_map<int, std::unordered_set<int>>& graph,
+                std::unordered_set<int>& visited, std::unordered_set<int>& component) {
+                    std::stack<int> stack;
+                    stack.push(node);
+
+                    while (!stack.empty()) {
+                        int current = stack.top();
+                        stack.pop();
+
+                        if (visited.find(current) == visited.end()) {
+                            visited.insert(current);
+                            component.insert(current);
+                            for (int neighbor : graph[current]) {
+                                if (visited.find(neighbor) == visited.end()) {
+                                    stack.push(neighbor);
+                                }
+                            }
+                        }
+                    }
+                };
+
+            auto findConnectedComponents = [&](const std::vector<std::unordered_set<int>>& sets) {
+                std::unordered_map<int, std::unordered_set<int>> graph;
+
+                for (const auto& s : sets) {
+                    auto iter = s.begin();
+                    int a = *iter;
+                    int b = *(++iter);
+                    graph[a].insert(b);
+                    graph[b].insert(a);
+                }
+
+                std::unordered_set<int> visited;
+                std::vector<std::unordered_set<int>> components;
+
+                for (const auto& pair : graph) {
+                    int node = pair.first;
+                    if (visited.find(node) == visited.end()) {
+                        std::unordered_set<int> component;
+                        dfs(node, graph, visited, component);
+                        components.push_back(component);
+                    }
+                }
+
+                return components;
+                };
+            nonstandard_parts_set = findConnectedComponents(nonstandard_parts_set);
+            for(auto parts : nonstandard_parts_set) {
+				std::cout << "connected parts: ";
+				for (int part_num : parts)
+					std::cout << part_num << " ";
+				std::cout << std::endl;
+			}
+
+            for (auto parts : nonstandard_parts_set) {
+                std::vector<Part> part_set_try_merge;
+                for (int part_num : parts) 
+                    part_set_try_merge.push_back(pn2nonstandard_part[part_num]);
+                
             }
         }
 		else
