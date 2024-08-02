@@ -541,10 +541,6 @@ namespace Partition
 					}
 					h = h->next();
 				} while (h != face->halfedge());
-				if (poly.size() == 6 && split_hes.size() == 1) {
-					std::cout << "poly_size = " << poly.size() << ", split_v:" << split_hes.begin()->first->vertex()->point() << ", border_edge:" << border_edge->prev()->vertex()->point() << "->" << border_edge->vertex()->point() << std::endl;
-					int x = 1;
-				}
 				// cal A
 				if (border_edge == nullptr)
 					continue;
@@ -607,7 +603,7 @@ namespace Partition
 					Vertex_handle split_v = split_he->vertex();
 					//std::cout << "split_v: " << split_v->point() << std::endl;
 					VAttr& attr = sv.second;
-					std::cout << "chooseNum = " << attr.chooseNum << ", dis_to_A = " << attr.dis_to_A << ", node_to_A = " << attr.node_to_A << ", dist_to_B = " << attr.dis_to_B << ", node_to_B = " << attr.node_to_B << ", IsIntersect_to_A = " << attr.IsIntersect_to_A << ", IsIntersect_to_B = " << attr.IsIntersect_to_B << ", split_v = " << split_v->point() << ", border_edge point = " << border_edge->vertex()->point() << std::endl;
+					//std::cout << "chooseNum = " << attr.chooseNum << ", dis_to_A = " << attr.dis_to_A << ", node_to_A = " << attr.node_to_A << ", dist_to_B = " << attr.dis_to_B << ", node_to_B = " << attr.node_to_B << ", IsIntersect_to_A = " << attr.IsIntersect_to_A << ", IsIntersect_to_B = " << attr.IsIntersect_to_B << ", split_v = " << split_v->point() << ", border_edge point = " << border_edge->vertex()->point() << std::endl;
 					std::vector<Face_handle> face_paints;
 					std::vector<std::pair<Halfedge_handle, Halfedge_handle>> split_segs;
 					int part_num = -1;
