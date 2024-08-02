@@ -531,8 +531,11 @@ namespace Partition
 					}
 				};
 				std::unordered_map<Halfedge_handle, VAttr> split_hes;	// he->vertex() is split vertex
+				std::unordered_set<int> split_hes_pns;
 				Halfedge_handle h = face->halfedge();
 				do {
+					if (he2pn.find(h) != he2pn.end())
+						split_hes_pns.insert(he2pn[h]);
 					Vertex_handle v = h->vertex();
 					if (connected_vertex.find(v) != connected_vertex.end())
 						split_hes[h] = VAttr();
@@ -541,6 +544,7 @@ namespace Partition
 					}
 					h = h->next();
 				} while (h != face->halfedge());
+				std::cout << "split_hes.size() = " << split_hes.size() << std::endl;
 				// cal A
 				if (border_edge == nullptr)
 					continue;
@@ -594,11 +598,8 @@ namespace Partition
 					});
 				int another_part_num = -1;
 				Face_handle spare_face = face;
-				std::unordered_set<int> split_hes_pns;
 				for (auto& sv : split_hes_vec) {
 					Halfedge_handle split_he = sv.first;
-					split_hes_pns.insert(he2pn[split_he]);
-					split_hes_pns.insert(he2pn[split_he->next()]);
 					int shp_size = split_hes_pns.size();
 					Vertex_handle split_v = split_he->vertex();
 					//std::cout << "split_v: " << split_v->point() << std::endl;
@@ -806,18 +807,52 @@ namespace Partition
 			}
 			// 3. merge all non standart parts to standar part
 			// find the set of neibor nonstandard parts 
-			// TODO 并查集找连通子图
+			// TODO bing cha ji
 			std::vector<std::unordered_set<int>> nonstandard_parts_set; // neibor nonstandard set of part num
+			std::unordered_map<int, int> part_num2nonstandard_set_num; // part num to nonstandard set num
 			std::cout << "non standard parts:" << std::endl;
 			for (auto it : pn2nonstandard_part) {
 				const int& part_num = it.first;
 				const Part& part = it.second;
-				std::cout << "part_num = " << part_num << ",";
-				std::cout << "( ";
+
+				bool is_new_set = true;
+				int set_num = -1;
 				for (int pn : part.adjacent_nonstandard_part) {
-					std::cout << pn << " ";
+					if (part_num2nonstandard_set_num.find(pn) != part_num2nonstandard_set_num.end()) {
+						is_new_set = false;
+						set_num = part_num2nonstandard_set_num[pn];
+						break;
+					}
 				}
-				std::cout << ")";
+				if (is_new_set) {
+					set_num = nonstandard_parts_set.size();
+					nonstandard_parts_set.push_back(part.adjacent_nonstandard_part);
+					for (int pn : part.adjacent_nonstandard_part)
+						part_num2nonstandard_set_num[pn] = set_num;
+				}
+				else {
+					for (int pn : part.adjacent_nonstandard_part) {
+						nonstandard_parts_set[set_num].insert(pn);
+						part_num2nonstandard_set_num[pn] = set_num;
+					}
+				}
+			}
+			for (auto parts : nonstandard_parts_set) {
+				std::cout << "(";
+				for (int part_num : parts)
+					std::cout << part_num << " ";
+				std::cout << ")" << std::endl;
+			}
+
+			// merge
+			for (std::unordered_set<int> parts : nonstandard_parts_set) {
+				int the_first_part_num = *parts.begin();
+				std::vector<Polygon_2> polygons;
+				for (int part_num : parts) {
+					polygons.insert(polygons.end(), this->partition[part_num].begin(), this->partition[part_num].end());
+					this->partition[part_num].clear();
+				}
+				this->partition[the_first_part_num] = polygons;
 			}
 		}
 		else
