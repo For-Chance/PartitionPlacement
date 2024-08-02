@@ -501,7 +501,9 @@ namespace Partition
 				Halfedge_handle border_edge;
 				struct VAttr {  // vertex attribute
 					FT dis_to_A = 0;
+					int node_to_A = 0;
 					FT dis_to_B = 0;
+					int node_to_B = 0;
 					bool IsIntersect_to_A = false;
 					bool IsIntersect_to_B = false;
 					int ChooseNum() {   // 0: both not, 1: A, 2: B
@@ -539,6 +541,10 @@ namespace Partition
 					}
 					h = h->next();
 				} while (h != face->halfedge());
+				if (poly.size() == 6 && split_hes.size() == 1) {
+					std::cout << "poly_size = " << poly.size() << ", split_v:" << split_hes.begin()->first->vertex()->point() << ", border_edge:" << border_edge->prev()->vertex()->point() << "->" << border_edge->vertex()->point() << std::endl;
+					int x = 1;
+				}
 				// cal A
 				if (border_edge == nullptr)
 					continue;
@@ -546,11 +552,14 @@ namespace Partition
 				Halfedge_handle border_next_halfedge = border_edge->next();
 				h = border_next_halfedge;
 				FT dis = 0;
+				int node_num = 0;
 				while (h != border_edge) {
 					Vertex_handle v = h->vertex();
 					dis += CGAL::approximate_sqrt(CGAL::squared_distance(v->point(), h->prev()->vertex()->point()));
+					node_num++;
 					if (split_hes.find(h) != split_hes.end()) {
 						split_hes[h].dis_to_A = dis;
+						split_hes[h].node_to_A = node_num;
 						Segment_2 seg(v->point(), A->point());
 						split_hes[h].IsIntersect_to_A = !areTwoIntersectionPointsInside(poly, seg);
 					}
@@ -561,14 +570,17 @@ namespace Partition
 				Halfedge_handle border_prev_halfedge = border_edge->prev();
 				h = border_prev_halfedge;
 				dis = 0;
+				node_num = 0;
 				while (h != border_edge) {
-					Vertex_handle v = h->prev()->vertex();
-					dis += CGAL::approximate_sqrt(CGAL::squared_distance(v->point(), h->vertex()->point()));
+					Vertex_handle v = h->vertex();
 					if (split_hes.find(h) != split_hes.end()) {
 						split_hes[h].dis_to_B = dis;
+						split_hes[h].node_to_B = node_num;
 						Segment_2 seg(v->point(), B->point());
 						split_hes[h].IsIntersect_to_B = !areTwoIntersectionPointsInside(poly, seg);
 					}
+					dis += CGAL::approximate_sqrt(CGAL::squared_distance(h->prev()->vertex()->point(), v->point()));
+					node_num++;
 					h = h->prev();
 				};
 				// get choose num
@@ -593,8 +605,9 @@ namespace Partition
 					split_hes_pns.insert(he2pn[split_he->next()]);
 					int shp_size = split_hes_pns.size();
 					Vertex_handle split_v = split_he->vertex();
+					//std::cout << "split_v: " << split_v->point() << std::endl;
 					VAttr& attr = sv.second;
-					//std::cout << "chooseNum = " << attr.chooseNum << ", dis_to_A = " << attr.dis_to_A << ", dist_to_B = " << attr.dis_to_B << ", IsIntersect_to_A = " << attr.IsIntersect_to_A << ", IsIntersect_to_B = " << attr.IsIntersect_to_B << ", split_v = " << split_v->point() << ", border_edge point = " << border_edge->vertex()->point() << std::endl;
+					std::cout << "chooseNum = " << attr.chooseNum << ", dis_to_A = " << attr.dis_to_A << ", node_to_A = " << attr.node_to_A << ", dist_to_B = " << attr.dis_to_B << ", node_to_B = " << attr.node_to_B << ", IsIntersect_to_A = " << attr.IsIntersect_to_A << ", IsIntersect_to_B = " << attr.IsIntersect_to_B << ", split_v = " << split_v->point() << ", border_edge point = " << border_edge->vertex()->point() << std::endl;
 					std::vector<Face_handle> face_paints;
 					std::vector<std::pair<Halfedge_handle, Halfedge_handle>> split_segs;
 					int part_num = -1;
@@ -649,7 +662,6 @@ namespace Partition
 
 					if (attr.chooseNum == 1) {  // choose A
 						part_num = he2pn[split_he];
-						std::cout << split_v->point() << std::endl;
 						split_segs.push_back(std::make_pair(split_he, border_edge));
 					}
 					else if (attr.chooseNum == 2) {  // choose B
@@ -662,8 +674,9 @@ namespace Partition
 						Segment_2 A2sv = Segment_2(A->point(), split_v->point());
 						Line_2 supp_line = A2sv.supporting_line();
 
+						Segment_2 border_edge_seg(A->point(), B->point());
+						//std::cout << "sv:" << split_v->point() << ", A:" << A->point() << ", B:" << B->point() << ", border_edge length^2:" << border_edge_seg.squared_length() << std::endl;
 						Halfedge_handle start_he = border_edge;
-						std::cout << split_v->point() << std::endl;
 						bool is_loop_next_intersection = check_loop_next(start_he, supp_line);
 						if (!is_loop_next_intersection)
 							bool is_loop_prev_intersection = check_loop_prev(start_he, supp_line);
