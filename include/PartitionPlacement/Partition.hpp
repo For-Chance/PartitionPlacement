@@ -544,7 +544,7 @@ namespace Partition
 					}
 					h = h->next();
 				} while (h != face->halfedge());
-				std::cout << "split_hes.size() = " << split_hes.size() << std::endl;
+				//std::cout << "split_hes_pns.size() = " << split_hes_pns.size() << std::endl;
 				// cal A
 				if (border_edge == nullptr)
 					continue;
@@ -691,6 +691,8 @@ namespace Partition
 					}
 					else
 						throw std::runtime_error("ERROR! Choose nothing!");
+					if (split_segs.size() == 0)
+						std::cout << "ERRRRRRRRRRRRRRRRRR" << std::endl;
 					for (auto it : split_segs) {
 						Halfedge_handle split_face_he = decorator.split_face(it.first, it.second);
 						Face_handle fp = split_face_he->face();
@@ -844,16 +846,16 @@ namespace Partition
 				std::cout << ")" << std::endl;
 			}
 
-			// merge
-			for (std::unordered_set<int> parts : nonstandard_parts_set) {
-				int the_first_part_num = *parts.begin();
-				std::vector<Polygon_2> polygons;
-				for (int part_num : parts) {
-					polygons.insert(polygons.end(), this->partition[part_num].begin(), this->partition[part_num].end());
-					this->partition[part_num].clear();
-				}
-				this->partition[the_first_part_num] = polygons;
-			}
+			//// merge
+			//for (std::unordered_set<int> parts : nonstandard_parts_set) {
+			//	int the_first_part_num = *parts.begin();
+			//	std::vector<Polygon_2> polygons;
+			//	for (int part_num : parts) {
+			//		polygons.insert(polygons.end(), this->partition[part_num].begin(), this->partition[part_num].end());
+			//		this->partition[part_num].clear();
+			//	}
+			//	this->partition[the_first_part_num] = polygons;
+			//}
 		}
 		else
 			polygon = this->K2InnerK.convert(origin_space);
