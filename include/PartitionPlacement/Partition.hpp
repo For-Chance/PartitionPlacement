@@ -666,19 +666,22 @@ namespace Partition
 						split_segs.push_back(std::make_pair(border_edge->prev(), split_he));
 					}
 					else if (attr.chooseNum == -1) {    // choose A but there is intersection
+						std::cout << "chooseNum = " << attr.chooseNum << ", dis_to_A = " << attr.dis_to_A << ", node_to_A = " << attr.node_to_A << ", dist_to_B = " << attr.dis_to_B << ", node_to_B = " << attr.node_to_B << ", IsIntersect_to_A = " << attr.IsIntersect_to_A << ", IsIntersect_to_B = " << attr.IsIntersect_to_B << ", split_v = " << split_v->point() << ", border_edge point = " << border_edge->vertex()->point() << std::endl;
+
 						part_num = he2pn[split_he];
 						Vertex_handle A = attr.A;
 						Segment_2 A2sv = Segment_2(A->point(), split_v->point());
 						Line_2 supp_line = A2sv.supporting_line();
 
 						Segment_2 border_edge_seg(A->point(), B->point());
-						//std::cout << "sv:" << split_v->point() << ", A:" << A->point() << ", B:" << B->point() << ", border_edge length^2:" << border_edge_seg.squared_length() << std::endl;
 						Halfedge_handle start_he = border_edge;
 						bool is_loop_next_intersection = check_loop_next(start_he, supp_line);
 						if (!is_loop_next_intersection)
 							bool is_loop_prev_intersection = check_loop_prev(start_he, supp_line);
 					}
 					else if (attr.chooseNum == -2) {    // choose B but there is intersection
+						std::cout << "chooseNum = " << attr.chooseNum << ", dis_to_A = " << attr.dis_to_A << ", node_to_A = " << attr.node_to_A << ", dist_to_B = " << attr.dis_to_B << ", node_to_B = " << attr.node_to_B << ", IsIntersect_to_A = " << attr.IsIntersect_to_A << ", IsIntersect_to_B = " << attr.IsIntersect_to_B << ", split_v = " << split_v->point() << ", border_edge point = " << border_edge->vertex()->point() << std::endl;
+
 						part_num = he2pn[split_he->next()];
 						Vertex_handle B = attr.B;
 						Segment_2 sv2B = Segment_2(split_v->point(), B->point());
@@ -698,6 +701,8 @@ namespace Partition
 						Face_handle fp = split_face_he->face();
 						spare_face = split_face_he->opposite()->face();
 						temp_convert_faces.insert(face);
+						if (split_hes_pns.find(part_num) == split_hes_pns.end())
+							std::cout << "ERROR! There is no part_num in split_hes_pns!" << std::endl;
 						split_hes_pns.erase(part_num);
 						Face_partition[part_num].insert(fp);
 						Halfedge_handle cur_h = fp->halfedge();
