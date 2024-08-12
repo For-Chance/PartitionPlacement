@@ -534,17 +534,24 @@ namespace Partition
 				std::unordered_set<int> split_hes_pns;
 				Halfedge_handle h = face->halfedge();
 				do {
-					if (he2pn.find(h) != he2pn.end())
-						split_hes_pns.insert(he2pn[h]);
+					/*if (he2pn.find(h) != he2pn.end())
+						split_hes_pns.insert(he2pn[h]);*/
 					Vertex_handle v = h->vertex();
-					if (connected_vertex.find(v) != connected_vertex.end())
+					if (connected_vertex.find(v) != connected_vertex.end()) {
 						split_hes[h] = VAttr();
+						split_hes_pns.insert(he2pn[h]);
+						split_hes_pns.insert(he2pn[h->next()]);
+					}
 					if (!h->is_bisector()) {
 						border_edge = h;
 					}
 					h = h->next();
 				} while (h != face->halfedge());
-				//std::cout << "split_hes_pns.size() = " << split_hes_pns.size() << std::endl;
+				/*std::cout << "split_hes_pns.size() = " << split_hes_pns.size() << ": ";
+				for (auto pn : split_hes_pns)
+					std::cout << pn << " ";
+				std::cout << std::endl;*/
+
 				// cal A
 				if (border_edge == nullptr)
 					continue;
@@ -646,14 +653,14 @@ namespace Partition
 						while (cur_h != split_he) {
 							if (supp_line.has_on_positive_side(cur_v->point()) == RIGHT_DIRECTION || supp_line.has_on_boundary(cur_v->point())) {
 								if (last_right_he->prev() != cur_h)
-									split_segs.push_back(std::make_pair(cur_h, last_right_he));
+									split_segs.push_back(std::make_pair(last_right_he, cur_h));
 								last_right_he = cur_h;
 							}
 							cur_h = cur_h->prev();
 							cur_v = cur_h->vertex();
 						};
 						if (last_right_he != start_he && last_right_he->prev() != cur_h)
-							split_segs.push_back(std::make_pair(cur_h, last_right_he));
+							split_segs.push_back(std::make_pair(last_right_he, cur_h));
 						return last_right_he != start_he;
 						};
 
@@ -666,8 +673,6 @@ namespace Partition
 						split_segs.push_back(std::make_pair(border_edge->prev(), split_he));
 					}
 					else if (attr.chooseNum == -1) {    // choose A but there is intersection
-						std::cout << "chooseNum = " << attr.chooseNum << ", dis_to_A = " << attr.dis_to_A << ", node_to_A = " << attr.node_to_A << ", dist_to_B = " << attr.dis_to_B << ", node_to_B = " << attr.node_to_B << ", IsIntersect_to_A = " << attr.IsIntersect_to_A << ", IsIntersect_to_B = " << attr.IsIntersect_to_B << ", split_v = " << split_v->point() << ", border_edge point = " << border_edge->vertex()->point() << std::endl;
-
 						part_num = he2pn[split_he];
 						Vertex_handle A = attr.A;
 						Segment_2 A2sv = Segment_2(A->point(), split_v->point());
@@ -680,8 +685,6 @@ namespace Partition
 							bool is_loop_prev_intersection = check_loop_prev(start_he, supp_line);
 					}
 					else if (attr.chooseNum == -2) {    // choose B but there is intersection
-						std::cout << "chooseNum = " << attr.chooseNum << ", dis_to_A = " << attr.dis_to_A << ", node_to_A = " << attr.node_to_A << ", dist_to_B = " << attr.dis_to_B << ", node_to_B = " << attr.node_to_B << ", IsIntersect_to_A = " << attr.IsIntersect_to_A << ", IsIntersect_to_B = " << attr.IsIntersect_to_B << ", split_v = " << split_v->point() << ", border_edge point = " << border_edge->vertex()->point() << std::endl;
-
 						part_num = he2pn[split_he->next()];
 						Vertex_handle B = attr.B;
 						Segment_2 sv2B = Segment_2(split_v->point(), B->point());
@@ -695,7 +698,7 @@ namespace Partition
 					else
 						throw std::runtime_error("ERROR! Choose nothing!");
 					if (split_segs.size() == 0)
-						std::cout << "ERRRRRRRRRRRRRRRRRR" << std::endl;
+						std::cout << "ERROR! Choose nothing in last part!" << std::endl;
 					for (auto it : split_segs) {
 						Halfedge_handle split_face_he = decorator.split_face(it.first, it.second);
 						Face_handle fp = split_face_he->face();
@@ -703,6 +706,7 @@ namespace Partition
 						temp_convert_faces.insert(face);
 						if (split_hes_pns.find(part_num) == split_hes_pns.end())
 							std::cout << "ERROR! There is no part_num in split_hes_pns!" << std::endl;
+						//std::cout << "delete " << part_num << std::endl;
 						split_hes_pns.erase(part_num);
 						Face_partition[part_num].insert(fp);
 						Halfedge_handle cur_h = fp->halfedge();
@@ -716,6 +720,8 @@ namespace Partition
 				int part_num = -1;
 				if (split_hes_pns.size() == 1) {
 					part_num = *split_hes_pns.begin();
+					//std::cout << "delete " << part_num << std::endl;
+					split_hes_pns.erase(part_num);
 					Face_partition[part_num].insert(spare_face);
 					Halfedge_handle cur_h = spare_face->halfedge();
 					do {
@@ -851,16 +857,16 @@ namespace Partition
 				std::cout << ")" << std::endl;
 			}
 
-			//// merge
-			//for (std::unordered_set<int> parts : nonstandard_parts_set) {
-			//	int the_first_part_num = *parts.begin();
-			//	std::vector<Polygon_2> polygons;
-			//	for (int part_num : parts) {
-			//		polygons.insert(polygons.end(), this->partition[part_num].begin(), this->partition[part_num].end());
-			//		this->partition[part_num].clear();
-			//	}
-			//	this->partition[the_first_part_num] = polygons;
-			//}
+			// merge
+			for (std::unordered_set<int> parts : nonstandard_parts_set) {
+				int the_first_part_num = *parts.begin();
+				std::vector<Polygon_2> polygons;
+				for (int part_num : parts) {
+					polygons.insert(polygons.end(), this->partition[part_num].begin(), this->partition[part_num].end());
+					this->partition[part_num].clear();
+				}
+				this->partition[the_first_part_num] = polygons;
+			}
 		}
 		else
 			polygon = this->K2InnerK.convert(origin_space);
