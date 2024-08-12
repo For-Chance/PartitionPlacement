@@ -122,23 +122,23 @@ namespace Partition
 			} while (h != first);
 			return Polygon_2(ps.begin(), ps.end());
 		}
-		Polygon_with_holes_2 complicate_boundary(const Polygon_with_holes_2& polygon, FT min_gap = 5000)
+		Polygon_with_holes_2 complicate_boundary(const Polygon_with_holes_2& polygon, FT min_gap = -1)
 		{
-			//if (min_gap == -1)
-			//{
-			//	// Find the minimum edge length
-			//	FT min_length = std::numeric_limits<FT>::max();
-			//	for (auto edge = polygon.outer_boundary().edges_begin(); edge != polygon.outer_boundary().edges_end(); ++edge)
-			//	{
-			//		FT length = CGAL::squared_distance(edge->source(), edge->target());
-			//		if (length < min_length)
-			//		{
-			//			min_length = length;
-			//		}
-			//	}
+			if (min_gap == -1)
+			{
+				// Find the minimum edge length
+				FT min_length = std::numeric_limits<FT>::max();
+				for (auto edge = polygon.outer_boundary().edges_begin(); edge != polygon.outer_boundary().edges_end(); ++edge)
+				{
+					FT length = CGAL::squared_distance(edge->source(), edge->target());
+					if (length < min_length)
+					{
+						min_length = length;
+					}
+				}
 
-			//	min_gap = CGAL::approximate_sqrt(min_length) * 50;
-			//}
+				min_gap = CGAL::approximate_sqrt(min_length) * 50;
+			}
 
 			std::cout << "min_gap" << min_gap << std::endl;
 			// Iterate over each edge and add points
@@ -160,7 +160,7 @@ namespace Partition
 				}
 			}
 			outer_boundary = Polygon_2(points.begin(), points.end());
-			std::cout << polygon.outer_boundary().size() << " -> " << outer_boundary.size() << std::endl;
+			std::cout << polygon.outer_boundary().vertices().size() << " -> " << outer_boundary.vertices().size() << std::endl;
 
 			std::vector<Polygon_2> holes;
 			for (auto it = polygon.holes_begin(); it != polygon.holes_end(); ++it)
@@ -237,7 +237,8 @@ namespace Partition
 			SimplifyBoundary::ExpandProps<InnerK> expandProps = SimplifyBoundary::ExpandProps<InnerK>();
 			expandProps.simplify_order = props.simplify_order;
 			SimplifyBoundary::Solver<InnerK> sbSolver(this->K2InnerK.convert(this->origin_space), simpProps, expandProps);
-			this->polygon = this->complicate_boundary(sbSolver.simplify_space);
+			this->polygon = this->complicate_boundary(sbSolver.simplify_space, 5000);
+			//this->polygon = sbSolver2.simplify_space;
 
 			// 2. skeleton 
 			this->skeleton = build_skeleton(this->polygon);
@@ -729,6 +730,10 @@ namespace Partition
 							split_segs.push_back(std::make_pair(last_right_he, cur_h));
 						return last_right_he != start_he;
 						};
+					auto insert_vertex_and_create_edge = [](boost::shared_ptr<Ss>& skeleton, Halfedge_handle he, const Point_2& new_point, Halfedge_handle split_he) {
+						// insert vertex in the border_edge
+						};
+
 
 					if (attr.chooseNum == 1) {  // choose A
 						part_num = he2pn[split_he];
@@ -925,6 +930,9 @@ namespace Partition
 
 			// merge
 			for (std::unordered_set<int> parts : nonstandard_parts_set) {
+				// find the suitable parts (drop the part whose have leaf vertex)
+
+
 				int the_first_part_num = *parts.begin();
 				std::vector<Polygon_2> polygons;
 				for (int part_num : parts) {
