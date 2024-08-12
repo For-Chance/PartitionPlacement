@@ -122,6 +122,72 @@ namespace Partition
 			} while (h != first);
 			return Polygon_2(ps.begin(), ps.end());
 		}
+		Polygon_with_holes_2 complicate_boundary(const Polygon_with_holes_2& polygon, FT min_gap = 5000)
+		{
+			//if (min_gap == -1)
+			//{
+			//	// Find the minimum edge length
+			//	FT min_length = std::numeric_limits<FT>::max();
+			//	for (auto edge = polygon.outer_boundary().edges_begin(); edge != polygon.outer_boundary().edges_end(); ++edge)
+			//	{
+			//		FT length = CGAL::squared_distance(edge->source(), edge->target());
+			//		if (length < min_length)
+			//		{
+			//			min_length = length;
+			//		}
+			//	}
+
+			//	min_gap = CGAL::approximate_sqrt(min_length) * 50;
+			//}
+
+			std::cout << "min_gap" << min_gap << std::endl;
+			// Iterate over each edge and add points
+			Polygon_2 outer_boundary;
+			std::vector<Point_2> points;
+			for (auto edge = polygon.outer_boundary().edges_begin(); edge != polygon.outer_boundary().edges_end(); ++edge)
+			{
+				FT length = CGAL::squared_distance(edge->source(), edge->target());
+				int num_points = std::ceil(std::sqrt(length) / min_gap);
+				//std::cout << num_points << std::endl;
+
+				Vector_2 direction = (edge->target() - edge->source()) / num_points;
+				Point_2 current_point = edge->source();
+
+				for (int i = 0; i < num_points; ++i)
+				{
+					current_point = current_point + direction;
+					points.push_back(current_point);
+				}
+			}
+			outer_boundary = Polygon_2(points.begin(), points.end());
+			std::cout << polygon.outer_boundary().size() << " -> " << outer_boundary.size() << std::endl;
+
+			std::vector<Polygon_2> holes;
+			for (auto it = polygon.holes_begin(); it != polygon.holes_end(); ++it)
+			{
+				Polygon_2 hole;
+				std::vector<Point_2> points;
+				for (auto edge = it->edges_begin(); edge != it->edges_end(); ++edge)
+				{
+					FT length = CGAL::squared_distance(edge->source(), edge->target());
+					int num_points = std::ceil(std::sqrt(length) / min_gap);
+
+					Vector_2 direction = (edge->target() - edge->source()) / num_points;
+					Point_2 current_point = edge->source();
+
+					for (int i = 0; i < num_points; ++i)
+					{
+						current_point = current_point + direction;
+						points.push_back(current_point);
+					}
+				}
+				hole = Polygon_2(points.begin(), points.end());
+				std::cout << it->size() << " -> " << hole.size() << std::endl;
+				holes.push_back(hole);
+			}
+
+			return Polygon_with_holes_2(outer_boundary, holes.begin(), holes.end());
+		}
 
 		KernelConverter::KernelConverter<K, InnerK, KernelConverter::NumberConverter<typename K::FT, FT>>K2InnerK;
 		KernelConverter::KernelConverter<InnerK, K, KernelConverter::NumberConverter<FT, typename K::FT>>InnerK2K;
@@ -171,7 +237,7 @@ namespace Partition
 			SimplifyBoundary::ExpandProps<InnerK> expandProps = SimplifyBoundary::ExpandProps<InnerK>();
 			expandProps.simplify_order = props.simplify_order;
 			SimplifyBoundary::Solver<InnerK> sbSolver(this->K2InnerK.convert(this->origin_space), simpProps, expandProps);
-			this->polygon = sbSolver.simplify_space;
+			this->polygon = this->complicate_boundary(sbSolver.simplify_space);
 
 			// 2. skeleton 
 			this->skeleton = build_skeleton(this->polygon);
