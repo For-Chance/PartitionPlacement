@@ -92,7 +92,9 @@ namespace Partition
 		/// </summary>
 		/// <param name="polygon"></param>
 		/// <returns></returns>
-		boost::shared_ptr<Ss> build_skeleton(const Polygon_with_holes_2& polygon) {
+		boost::shared_ptr<Ss> build_skeleton(
+			const Polygon_with_holes_2& polygon
+		) {
 			std::cout << "start building skeleton..." << std::endl;
 			auto start = std::chrono::high_resolution_clock::now();
 			SsBuilder ssb;
@@ -196,6 +198,13 @@ namespace Partition
 			return std::move(Polygon_with_holes_2(outer_boundary, holes.begin(), holes.end()));
 		}
 
+		static void assign_skeleton_segments(const boost::shared_ptr<Ss>& skeleton, std::vector<Segment_2>& skeleton_segments) {
+			for (Halfedge_iterator it = skeleton->halfedges_begin(); it != skeleton->halfedges_end(); ++it) {
+				Vertex_handle from = it->opposite()->vertex(), to = it->vertex();
+				skeleton_segments.push_back(Segment_2(from->point(), to->point()));
+			}
+		}
+
 		KernelConverter::KernelConverter<K, InnerK, KernelConverter::NumberConverter<typename K::FT, FT>>K2InnerK;
 		KernelConverter::KernelConverter<InnerK, K, KernelConverter::NumberConverter<FT, typename K::FT>>InnerK2K;
 		CGAL::Polygon_with_holes_2<K> origin_space;
@@ -247,10 +256,7 @@ namespace Partition
 
 			// 2. skeleton 
 			this->skeleton = build_skeleton(this->polygon);
-			for (Halfedge_iterator it = this->skeleton->halfedges_begin(); it != this->skeleton->halfedges_end(); ++it) {
-				Vertex_handle from = it->opposite()->vertex(), to = it->vertex();
-				skeleton_segments.push_back(Segment_2(from->point(), to->point()));
-			}
+			assign_skeleton_segments(this->skeleton, this->skeleton_segments);
 			Decorator decorator(*this->skeleton);
 
 			std::cout << "partition..." << std::endl;
