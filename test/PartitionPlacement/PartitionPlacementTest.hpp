@@ -103,7 +103,6 @@ namespace ParitionPlacement
 		const std::vector<std::vector<Polygon_2>>& partition = ppSolver.get_partition();
 		const std::vector<Polygon_2>& uncertain_parts = ppSolver.get_uncertain_parts();
 		const std::vector<Segment_2>& split_segments = ppSolver.get_split_segments();
-		const std::vector<Point_2>& log_points = ppSolver.get_log_points();
 		std::vector<Polygon_2> PolyParts_outer, PolyParts_holes;
 		PolyParts_outer.push_back(space.outer_boundary());
 		PolyParts_holes.insert(PolyParts_holes.end(), space.holes_begin(), space.holes_end());
@@ -158,9 +157,6 @@ namespace ParitionPlacement
 			}
 			mainwindow.drawPartitions(uncertain_parts, Segment_Color, Room_Color, Point_Color);
 			mainwindow.drawSegments(split_segments, SplitSeg_Color);
-			mainwindow.drawPoints(log_points, Log_Color);
-			for (int idx = 0; idx < log_points.size(); idx++)
-				mainwindow.drawText(log_points[idx], QString::number(idx));
 		}
 		if (controlProps.withSimplifyBoundary) {
 			CGAL::Color Simplify_Segment_Color(150, 150, 150);
