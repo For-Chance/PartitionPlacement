@@ -112,7 +112,7 @@ namespace Partition
 		/// </summary>
 		/// <param name="face"></param>
 		/// <returns></returns>
-		Polygon_2 get_Poly_from_Face(const Face_handle& face) {
+		static Polygon_2 get_Poly_from_Face(const Face_handle& face) {
 			std::vector<Point_2> ps;
 			ps.reserve(20);
 			Halfedge_handle h = face->halfedge();
@@ -122,7 +122,7 @@ namespace Partition
 				ps.push_back(point);
 				h = h->next();
 			} while (h != first);
-			return Polygon_2(ps.begin(), ps.end());
+			return std::move(Polygon_2(ps.begin(), ps.end()));
 		}
 		Polygon_with_holes_2 simplify_boundary(const Polygon_with_holes_2& polygon, const std::string& simplify_order) const {
 			SimplifyBoundary::SimplifyProps<InnerK> simpProps = SimplifyBoundary::SimplifyProps<InnerK>();
@@ -198,10 +198,22 @@ namespace Partition
 			return std::move(Polygon_with_holes_2(outer_boundary, holes.begin(), holes.end()));
 		}
 
-		static void assign_skeleton_segments(const boost::shared_ptr<Ss>& skeleton, std::vector<Segment_2>& skeleton_segments) {
+		static void assign_skeleton_segments(
+			const boost::shared_ptr<Ss>& skeleton, 
+			std::vector<Segment_2>& skeleton_segments
+		) {
 			for (Halfedge_iterator it = skeleton->halfedges_begin(); it != skeleton->halfedges_end(); ++it) {
 				Vertex_handle from = it->opposite()->vertex(), to = it->vertex();
 				skeleton_segments.push_back(Segment_2(from->point(), to->point()));
+			}
+		}
+		static void assign_skeleton_faces(
+			const boost::shared_ptr<Ss>& skeleton,
+			std::vector<Polygon_2>& skeleton_faces
+		) {
+			for (Face_iterator it = skeleton->faces_begin(); it != skeleton->faces_end(); ++it) {
+				Face_handle face = it;
+				skeleton_faces.push_back(get_Poly_from_Face(face));
 			}
 		}
 
@@ -248,24 +260,19 @@ namespace Partition
 	{
 		this->origin_space = space;
 		if (props.withSimplifyBoundary) {
-			// 1. Simplify Boundary
+			std::cout << "STEP 1: Simplify Boundary" << std::endl;
 			Polygon_with_holes_2 InnerK_space = this->K2InnerK.convert(this->origin_space);
 			Polygon_with_holes_2 simplify_space = simplify_boundary(InnerK_space, props.simplify_order);
 			this->polygon = this->complicate_boundary(simplify_space, 5000);
 			//this->polygon = simplify_space;
 
-			// 2. skeleton 
+			std::cout << "STEP 2: Build Skeleton" << std::endl;
 			this->skeleton = build_skeleton(this->polygon);
-			assign_skeleton_segments(this->skeleton, this->skeleton_segments);
 			Decorator decorator(*this->skeleton);
+			assign_skeleton_segments(this->skeleton, this->skeleton_segments);
+			assign_skeleton_faces(this->skeleton, this->skeleton_faces);
 
-			std::cout << "partition..." << std::endl;
 			// 3. find centerline
-			// 3.1 save to skeleton_faces
-			for (Face_iterator it = this->skeleton->faces_begin(); it != this->skeleton->faces_end(); ++it) {
-				Face_handle face = it;
-				skeleton_faces.push_back(get_Poly_from_Face(face));
-			}
 			// 3.2 find center line
 			// first we try to make skeleton of no connect boundary is center line
 			std::unordered_map<Vertex_handle, int> centerline_vertex2cnt;
