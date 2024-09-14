@@ -122,7 +122,14 @@ namespace Partition
 			} while (h != first);
 			return Polygon_2(ps.begin(), ps.end());
 		}
-		Polygon_with_holes_2 complicate_boundary(const Polygon_with_holes_2& polygon, FT min_gap = -1)
+		Polygon_with_holes_2 simplify_boundary(const Polygon_with_holes_2& polygon, const std::string& simplify_order) const {
+			SimplifyBoundary::SimplifyProps<InnerK> simpProps = SimplifyBoundary::SimplifyProps<InnerK>();
+			SimplifyBoundary::ExpandProps<InnerK> expandProps = SimplifyBoundary::ExpandProps<InnerK>();
+			expandProps.simplify_order = simplify_order;
+			SimplifyBoundary::Solver<InnerK> sbSolver(polygon, simpProps, expandProps);
+			return std::move(sbSolver.simplify_space);
+		}
+		Polygon_with_holes_2 complicate_boundary(const Polygon_with_holes_2& polygon, FT min_gap = -1) const
 		{
 			if (min_gap == -1)
 			{
@@ -186,7 +193,7 @@ namespace Partition
 				holes.push_back(hole);
 			}
 
-			return Polygon_with_holes_2(outer_boundary, holes.begin(), holes.end());
+			return std::move(Polygon_with_holes_2(outer_boundary, holes.begin(), holes.end()));
 		}
 
 		KernelConverter::KernelConverter<K, InnerK, KernelConverter::NumberConverter<typename K::FT, FT>>K2InnerK;
@@ -233,12 +240,10 @@ namespace Partition
 		this->origin_space = space;
 		if (props.withSimplifyBoundary) {
 			// 1. Simplify Boundary
-			SimplifyBoundary::SimplifyProps<InnerK> simpProps = SimplifyBoundary::SimplifyProps<InnerK>();
-			SimplifyBoundary::ExpandProps<InnerK> expandProps = SimplifyBoundary::ExpandProps<InnerK>();
-			expandProps.simplify_order = props.simplify_order;
-			SimplifyBoundary::Solver<InnerK> sbSolver(this->K2InnerK.convert(this->origin_space), simpProps, expandProps);
-			this->polygon = this->complicate_boundary(sbSolver.simplify_space, 5000);
-			//this->polygon = sbSolver2.simplify_space;
+			Polygon_with_holes_2 InnerK_space = this->K2InnerK.convert(this->origin_space);
+			Polygon_with_holes_2 simplify_space = simplify_boundary(InnerK_space, props.simplify_order);
+			this->polygon = this->complicate_boundary(simplify_space, 5000);
+			//this->polygon = simplify_space;
 
 			// 2. skeleton 
 			this->skeleton = build_skeleton(this->polygon);
