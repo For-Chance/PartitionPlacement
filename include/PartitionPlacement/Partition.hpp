@@ -124,14 +124,54 @@ namespace Partition
 			} while (h != first);
 			return std::move(Polygon_2(ps.begin(), ps.end()));
 		}
-		Polygon_with_holes_2 simplify_boundary(const Polygon_with_holes_2& polygon, const std::string& simplify_order) const {
+		static std::vector<Halfedge_handle> get_adj_centerline_halfedge(
+			const std::unordered_set<Halfedge_handle>& centerline_hes,
+			const Vertex_handle& v
+		) {
+			std::vector<Halfedge_handle> adj_hes;
+			Halfedge_handle h = v->halfedge();
+			do {
+				Halfedge_handle adj_h = h->opposite();
+				if (h->is_bisector() && centerline_hes.find(adj_h) != centerline_hes.end())
+					adj_hes.push_back(adj_h);
+				h = h->next()->opposite();
+			} while (h != v->halfedge());
+			return std::move(adj_hes);
+		}
+		
+		static void assign_skeleton_segments(
+			const boost::shared_ptr<Ss>& skeleton, 
+			std::vector<Segment_2>& skeleton_segments
+		) {
+			for (Halfedge_iterator it = skeleton->halfedges_begin(); it != skeleton->halfedges_end(); ++it) {
+				Vertex_handle from = it->opposite()->vertex(), to = it->vertex();
+				skeleton_segments.push_back(Segment_2(from->point(), to->point()));
+			}
+		}
+		static void assign_skeleton_faces(
+			const boost::shared_ptr<Ss>& skeleton,
+			std::vector<Polygon_2>& skeleton_faces
+		) {
+			for (Face_iterator it = skeleton->faces_begin(); it != skeleton->faces_end(); ++it) {
+				Face_handle face = it;
+				skeleton_faces.push_back(get_Poly_from_Face(face));
+			}
+		}
+
+		Polygon_with_holes_2 simplify_boundary(
+			const Polygon_with_holes_2& polygon,
+			const std::string& simplify_order
+		) const {
 			SimplifyBoundary::SimplifyProps<InnerK> simpProps = SimplifyBoundary::SimplifyProps<InnerK>();
 			SimplifyBoundary::ExpandProps<InnerK> expandProps = SimplifyBoundary::ExpandProps<InnerK>();
 			expandProps.simplify_order = simplify_order;
 			SimplifyBoundary::Solver<InnerK> sbSolver(polygon, simpProps, expandProps);
 			return std::move(sbSolver.simplify_space);
 		}
-		Polygon_with_holes_2 complicate_boundary(const Polygon_with_holes_2& polygon, FT min_gap = -1) const
+		Polygon_with_holes_2 complicate_boundary(
+			const Polygon_with_holes_2& polygon,
+			FT min_gap = -1
+		) const
 		{
 			if (min_gap == -1)
 			{
@@ -141,11 +181,8 @@ namespace Partition
 				{
 					FT length = CGAL::squared_distance(edge->source(), edge->target());
 					if (length < min_length)
-					{
 						min_length = length;
-					}
 				}
-
 				min_gap = CGAL::approximate_sqrt(min_length) * 50;
 			}
 
@@ -196,25 +233,6 @@ namespace Partition
 			}
 
 			return std::move(Polygon_with_holes_2(outer_boundary, holes.begin(), holes.end()));
-		}
-
-		static void assign_skeleton_segments(
-			const boost::shared_ptr<Ss>& skeleton, 
-			std::vector<Segment_2>& skeleton_segments
-		) {
-			for (Halfedge_iterator it = skeleton->halfedges_begin(); it != skeleton->halfedges_end(); ++it) {
-				Vertex_handle from = it->opposite()->vertex(), to = it->vertex();
-				skeleton_segments.push_back(Segment_2(from->point(), to->point()));
-			}
-		}
-		static void assign_skeleton_faces(
-			const boost::shared_ptr<Ss>& skeleton,
-			std::vector<Polygon_2>& skeleton_faces
-		) {
-			for (Face_iterator it = skeleton->faces_begin(); it != skeleton->faces_end(); ++it) {
-				Face_handle face = it;
-				skeleton_faces.push_back(get_Poly_from_Face(face));
-			}
 		}
 
 		KernelConverter::KernelConverter<K, InnerK, KernelConverter::NumberConverter<typename K::FT, FT>>K2InnerK;
@@ -341,17 +359,6 @@ namespace Partition
 				} while (h != v->halfedge());
 				return adj_vertex;
 				};
-			auto get_adj_centerline_halfedge = [&](Vertex_handle v) {
-				std::vector<Halfedge_handle> adj_hes;
-				Halfedge_handle h = v->halfedge();
-				do {
-					Halfedge_handle adj_h = h->opposite();
-					if (h->is_bisector() && centerline_vertex2cnt.find(adj_h->vertex()) != centerline_vertex2cnt.end())
-						adj_hes.push_back(adj_h);
-					h = h->next()->opposite();
-				} while (h != v->halfedge());
-				return adj_hes;
-				};
 			auto get_ans_num = [&](Vertex_handle v) {
 				return get_adj_centerline_vertex(v).size();
 				};
@@ -413,7 +420,7 @@ namespace Partition
 			std::unordered_set<Halfedge_handle> special_hes;
 			std::unordered_set<Halfedge_handle> visited;
 			for (Vertex_handle it : connected_vertex) {
-				std::vector<Halfedge_handle>& adj_hes = get_adj_centerline_halfedge(it);
+				std::vector<Halfedge_handle>& adj_hes = get_adj_centerline_halfedge(centerline_hes, it);
 				for (auto he : adj_hes) {
 					if (visited.find(he) != visited.end())
 						continue;
@@ -424,7 +431,7 @@ namespace Partition
 					visited.insert(he->opposite());
 					part.insert(it);
 					part.insert(v);
-					auto adj_next_hes = get_adj_centerline_halfedge(v);
+					auto adj_next_hes = get_adj_centerline_halfedge(centerline_hes, v);
 					while (adj_next_hes.size() == 2) {
 						Halfedge_handle next_hes = (part.find(adj_next_hes[0]->vertex()) == part.end()) ? adj_next_hes[0] : adj_next_hes[1];
 						if (visited.find(next_hes) != visited.end())
@@ -433,7 +440,7 @@ namespace Partition
 						visited.insert(next_hes->opposite());
 						Vertex_handle next_v = next_hes->vertex();
 						part.insert(next_v);
-						adj_next_hes = get_adj_centerline_halfedge(next_v);
+						adj_next_hes = get_adj_centerline_halfedge(centerline_hes, next_v);
 					}
 					if (part.size() == 2 && connected_vertex.find(v) != connected_vertex.end()) {
 						special_hes.insert(he);
