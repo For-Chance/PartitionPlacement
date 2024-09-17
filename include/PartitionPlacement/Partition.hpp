@@ -369,7 +369,46 @@ namespace Partition
 				}
 			}
 		}
-
+		void init_parition(
+			const std::unordered_set<Vertex_handle>& connected_vertices,
+			const std::unordered_set<Halfedge_handle>& centerline_hes,
+			std::vector<std::unordered_set<Vertex_handle>>& parts,
+			std::unordered_set<Halfedge_handle>& special_hes
+		) {
+			parts.clear();
+			special_hes.clear();
+			std::unordered_set<Halfedge_handle> visited;
+			for (Vertex_handle it : connected_vertices) {
+				std::vector<Halfedge_handle>& adj_hes = get_adj_centerline_halfedge(centerline_hes, it);
+				for (auto he : adj_hes) {
+					if (visited.find(he) != visited.end())
+						continue;
+					Vertex_handle v = he->vertex();
+					std::unordered_set<Vertex_handle> part;
+					int part_num = parts.size();
+					visited.insert(he);
+					visited.insert(he->opposite());
+					part.insert(it);
+					part.insert(v);
+					auto adj_next_hes = get_adj_centerline_halfedge(centerline_hes, v);
+					while (adj_next_hes.size() == 2) {
+						Halfedge_handle next_hes = (part.find(adj_next_hes[0]->vertex()) == part.end()) ? adj_next_hes[0] : adj_next_hes[1];
+						if (visited.find(next_hes) != visited.end())
+							break;
+						visited.insert(next_hes);
+						visited.insert(next_hes->opposite());
+						Vertex_handle next_v = next_hes->vertex();
+						part.insert(next_v);
+						adj_next_hes = get_adj_centerline_halfedge(centerline_hes, next_v);
+					}
+					if (part.size() == 2 && connected_vertices.find(v) != connected_vertices.end()) {
+						special_hes.insert(he);
+						special_hes.insert(he->opposite());
+					}
+					parts.push_back(part);
+				}
+			}
+		}
 
 		KernelConverter::KernelConverter<K, InnerK, KernelConverter::NumberConverter<typename K::FT, FT>>K2InnerK;
 		KernelConverter::KernelConverter<InnerK, K, KernelConverter::NumberConverter<FT, typename K::FT>>InnerK2K;
@@ -426,9 +465,6 @@ namespace Partition
 			assign_skeleton_segments(this->skeleton, this->skeleton_segments);
 			assign_skeleton_faces(this->skeleton, this->skeleton_faces);
 
-			// 3. find centerline
-			// 3.2 find center line
-			// first we try to make skeleton of no connect boundary is center line
 			std::unordered_set<Halfedge_handle> centerline_hes;
 			std::unordered_set<Vertex_handle> connected_vertices;
 			std::unordered_set<Vertex_handle> leaf_vertices;
@@ -437,41 +473,12 @@ namespace Partition
 
 			// 4. partition
 			// 4.1 init partition according to connected vertex
-			std::vector<std::unordered_set<Face_handle>> Face_partition;
 			std::vector<std::unordered_set<Vertex_handle>> parts;
 			std::unordered_set<Halfedge_handle> special_hes;
-			std::unordered_set<Halfedge_handle> visited;
-			for (Vertex_handle it : connected_vertices) {
-				std::vector<Halfedge_handle>& adj_hes = get_adj_centerline_halfedge(centerline_hes, it);
-				for (auto he : adj_hes) {
-					if (visited.find(he) != visited.end())
-						continue;
-					Vertex_handle v = he->vertex();
-					std::unordered_set<Vertex_handle> part;
-					int part_num = parts.size();
-					visited.insert(he);
-					visited.insert(he->opposite());
-					part.insert(it);
-					part.insert(v);
-					auto adj_next_hes = get_adj_centerline_halfedge(centerline_hes, v);
-					while (adj_next_hes.size() == 2) {
-						Halfedge_handle next_hes = (part.find(adj_next_hes[0]->vertex()) == part.end()) ? adj_next_hes[0] : adj_next_hes[1];
-						if (visited.find(next_hes) != visited.end())
-							break;
-						visited.insert(next_hes);
-						visited.insert(next_hes->opposite());
-						Vertex_handle next_v = next_hes->vertex();
-						part.insert(next_v);
-						adj_next_hes = get_adj_centerline_halfedge(centerline_hes, next_v);
-					}
-					if (part.size() == 2 && connected_vertices.find(v) != connected_vertices.end()) {
-						special_hes.insert(he);
-						special_hes.insert(he->opposite());
-					}
-					parts.push_back(part);
-				}
-			}
+			init_parition(connected_vertices, centerline_hes, parts, special_hes);
+			
 			std::cout << "partition num : " << parts.size() << ", parition edges num : ";
+			std::vector<std::unordered_set<Face_handle>> Face_partition;
 			int total_partition_edges_num = 0;
 			for (auto p : parts) {
 				std::cout << p.size() << " ";
