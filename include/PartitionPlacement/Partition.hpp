@@ -419,7 +419,7 @@ namespace Partition
 				}
 			}
 		}
-		void define_part_num(
+		void define_v_he_partnum(
 			const std::vector<std::unordered_set<Vertex_handle>>& parts,
 			std::unordered_map < Vertex_handle, std::unordered_set<int>>& v2pn,
 			std::unordered_map<Halfedge_handle, int>& he2pn
@@ -442,6 +442,78 @@ namespace Partition
 						}
 						h = h->next()->opposite();
 					} while (h != v->halfedge());
+				}
+			}
+		}
+		void define_face_partnum(
+			const std::unordered_map<Halfedge_handle, int>& he2pn,
+			const std::unordered_set<Vertex_handle>& connected_vertices,
+			const std::unordered_set<Vertex_handle>& leaf_vertices,
+			const int& total_partnum,
+			std::vector<std::unordered_set<Face_handle>>& Face_partition,
+			std::unordered_set<Face_handle>& uncertain_faces
+		) {
+			Face_partition = std::vector<std::unordered_set<Face_handle>>(total_partnum);
+			uncertain_faces.clear();
+			std::unordered_map<Face_handle, int> face2pn;                   // face 2 part num
+			for (auto it : he2pn) {
+				Halfedge_handle he = it.first;
+				int part_num = it.second;
+
+				std::queue<Face_handle> q;
+				std::unordered_set<Face_handle> q_set;  // make sure the face in the queue is unique, otherwise it will be endless loop
+				Face_handle f = he->face();
+				if (face2pn.find(f) != face2pn.end())
+					continue;
+
+				// the face is uncertain if there is a connected_vertices in there
+				bool is_uncertain = false;
+				Halfedge_handle h = f->halfedge();
+				do {
+					Vertex_handle v = h->vertex();
+					if (connected_vertices.find(v) != connected_vertices.end()) {
+						is_uncertain = true;
+						break;
+					}
+					h = h->next();
+				} while (h != f->halfedge());
+				if (is_uncertain)
+					uncertain_faces.insert(f);
+				else {
+					q.push(f);
+					q_set.insert(f);
+				}
+
+				// the face is certain if there is a leaf vertex
+				if (leaf_vertices.find(he->vertex()) != leaf_vertices.end()) {
+					Face_handle f = he->next()->opposite()->face();
+					q.push(f);
+					q_set.insert(f);
+				}
+
+				while (!q.empty()) {
+					Face_handle cur_face = q.front();
+					q.pop();
+					q_set.erase(cur_face);
+					face2pn[cur_face] = part_num;
+					Face_partition[part_num].insert(cur_face);
+					std::unordered_set<Face_handle>& adj_faces = get_adj_faces(cur_face);
+					for (auto& adj_face : adj_faces) {
+						bool is_same_part = true;
+						Halfedge_handle h = adj_face->halfedge();
+						do {
+							Vertex_handle v = h->vertex();
+							if (connected_vertices.find(v) != connected_vertices.end()) {
+								is_same_part = false;
+								break;
+							}
+							h = h->next();
+						} while (h != adj_face->halfedge());
+						if (is_same_part && face2pn.find(adj_face) == face2pn.end() && q_set.find(adj_face) == q_set.end()) {
+							q.push(adj_face);
+							q_set.insert(adj_face);
+						}
+					}
 				}
 			}
 		}
@@ -522,75 +594,13 @@ namespace Partition
 
 			std::unordered_map < Vertex_handle, std::unordered_set<int>> v2pn;
 			std::unordered_map<Halfedge_handle, int> he2pn;
-			define_part_num(parts, v2pn, he2pn);
+			define_v_he_partnum(parts, v2pn, he2pn);
 			
 			// 4.2 find certain faces and uncertain faces
-			std::vector<std::unordered_set<Face_handle>> certain_faces(parts.size());     // faces which are certain belong to which part
+			int total_partnum = parts.size();
 			std::unordered_set<Face_handle> uncertain_faces;                       // faces which are uncertain belong to which part   
-			std::unordered_map<Face_handle, int> face2pn;                   // face 2 part num
-			std::vector<std::unordered_set<Face_handle>> Face_partition(parts.size());
-			for (auto it : he2pn) {
-				Halfedge_handle he = it.first;
-				int part_num = it.second;
-
-				std::queue<Face_handle> q;
-				std::unordered_set<Face_handle> q_set;  // make sure the face in the queue is unique, otherwise it will be endless loop
-				Face_handle f = he->face();
-				if (face2pn.find(f) != face2pn.end())
-					continue;
-
-				// the face is uncertain if there is a connected_vertices in there
-				bool is_uncertain = false;
-				Halfedge_handle h = f->halfedge();
-				do {
-					Vertex_handle v = h->vertex();
-					if (connected_vertices.find(v) != connected_vertices.end()) {
-						is_uncertain = true;
-						break;
-					}
-					h = h->next();
-				} while (h != f->halfedge());
-				if (is_uncertain)
-					uncertain_faces.insert(f);
-				else {
-					q.push(f);
-					q_set.insert(f);
-				}
-
-				// the face is certain if there is a leaf vertex
-				if (leaf_vertices.find(he->vertex()) != leaf_vertices.end()) {
-					Face_handle f = he->next()->opposite()->face();
-					q.push(f);
-					q_set.insert(f);
-				}
-
-				while (!q.empty()) {
-					Face_handle cur_face = q.front();
-					q.pop();
-					q_set.erase(cur_face);
-					certain_faces[part_num].insert(cur_face);
-					face2pn[cur_face] = part_num;
-					Face_partition[part_num].insert(cur_face);
-					std::unordered_set<Face_handle>& adj_faces = get_adj_faces(cur_face);
-					//std::cout << "adj_faces.size() = " << adj_faces.size() << std::endl;
-					for (auto& adj_face : adj_faces) {
-						bool is_same_part = true;
-						Halfedge_handle h = adj_face->halfedge();
-						do {
-							Vertex_handle v = h->vertex();
-							if (connected_vertices.find(v) != connected_vertices.end()) {
-								is_same_part = false;
-								break;
-							}
-							h = h->next();
-						} while (h != adj_face->halfedge());
-						if (is_same_part && face2pn.find(adj_face) == face2pn.end() && q_set.find(adj_face) == q_set.end()) {
-							q.push(adj_face);
-							q_set.insert(adj_face);
-						}
-					}
-				}
-			}
+			std::vector<std::unordered_set<Face_handle>> Face_partition;
+			define_face_partnum(he2pn, connected_vertices, leaf_vertices, total_partnum, Face_partition, uncertain_faces);
 
 			// 4.3 get halfedge 2 part num
 			for (int part_num = 0; part_num < Face_partition.size(); part_num++)
