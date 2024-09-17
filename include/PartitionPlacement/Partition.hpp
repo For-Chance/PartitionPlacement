@@ -419,16 +419,11 @@ namespace Partition
 				}
 			}
 		}
-		void define_v_he_partnum(
+		void define_he2pn(
 			const std::vector<std::unordered_set<Vertex_handle>>& parts,
-			std::unordered_map < Vertex_handle, std::unordered_set<int>>& v2pn,
 			std::unordered_map<Halfedge_handle, int>& he2pn
 		) {
-			v2pn.clear();
 			he2pn.clear();
-			for (int part_num = 0; part_num < parts.size(); ++part_num)
-				for (auto v : parts[part_num])
-					v2pn[v].insert(part_num);
 			for (int i = 0; i < parts.size(); i++) {
 				const int& part_num = i;
 				const std::unordered_set<Vertex_handle>& part = parts[i];
@@ -517,6 +512,19 @@ namespace Partition
 				}
 			}
 		}
+		void refine_he2pn(
+			const std::vector<std::unordered_set<Face_handle>>& Face_partition,
+			std::unordered_map<Halfedge_handle, int>& he2pn
+		) {
+			for (int part_num = 0; part_num < Face_partition.size(); part_num++)
+				for (const Face_handle& face : Face_partition[part_num]) {
+					Halfedge_handle cur_h = face->halfedge();
+					do {
+						he2pn[cur_h] = part_num;
+						cur_h = cur_h->next();
+					} while (cur_h != face->halfedge());
+				}
+		}
 
 		KernelConverter::KernelConverter<K, InnerK, KernelConverter::NumberConverter<typename K::FT, FT>>K2InnerK;
 		KernelConverter::KernelConverter<InnerK, K, KernelConverter::NumberConverter<FT, typename K::FT>>InnerK2K;
@@ -592,25 +600,15 @@ namespace Partition
 			}
 			std::cout << ", sum up: " << total_partition_edges_num << std::endl;
 
-			std::unordered_map < Vertex_handle, std::unordered_set<int>> v2pn;
 			std::unordered_map<Halfedge_handle, int> he2pn;
-			define_v_he_partnum(parts, v2pn, he2pn);
+			define_he2pn(parts, he2pn);
 			
 			// 4.2 find certain faces and uncertain faces
 			int total_partnum = parts.size();
 			std::unordered_set<Face_handle> uncertain_faces;                       // faces which are uncertain belong to which part   
 			std::vector<std::unordered_set<Face_handle>> Face_partition;
 			define_face_partnum(he2pn, connected_vertices, leaf_vertices, total_partnum, Face_partition, uncertain_faces);
-
-			// 4.3 get halfedge 2 part num
-			for (int part_num = 0; part_num < Face_partition.size(); part_num++)
-				for (const Face_handle& face : Face_partition[part_num]) {
-					Halfedge_handle cur_h = face->halfedge();
-					do {
-						he2pn[cur_h] = part_num;
-						cur_h = cur_h->next();
-					} while (cur_h != face->halfedge());
-				}
+			refine_he2pn(Face_partition, he2pn);
 
 			// spilit uncertain faces
 			auto areTwoIntersectionPointsInside = [](const Polygon_2& polygon, const Segment_2& segment) {
