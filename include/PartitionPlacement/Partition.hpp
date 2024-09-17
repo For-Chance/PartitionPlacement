@@ -92,7 +92,9 @@ namespace Partition
 		/// </summary>
 		/// <param name="polygon"></param>
 		/// <returns></returns>
-		boost::shared_ptr<Ss> build_skeleton(const Polygon_with_holes_2& polygon) {
+		boost::shared_ptr<Ss> build_skeleton(
+			const Polygon_with_holes_2& polygon
+		) {
 			std::cout << "start building skeleton..." << std::endl;
 			auto start = std::chrono::high_resolution_clock::now();
 			SsBuilder ssb;
@@ -110,7 +112,7 @@ namespace Partition
 		/// </summary>
 		/// <param name="face"></param>
 		/// <returns></returns>
-		Polygon_2 get_Poly_from_Face(const Face_handle& face) {
+		static Polygon_2 get_Poly_from_Face(const Face_handle& face) {
 			std::vector<Point_2> ps;
 			ps.reserve(20);
 			Halfedge_handle h = face->halfedge();
@@ -120,9 +122,83 @@ namespace Partition
 				ps.push_back(point);
 				h = h->next();
 			} while (h != first);
-			return Polygon_2(ps.begin(), ps.end());
+			return std::move(Polygon_2(ps.begin(), ps.end()));
 		}
-		Polygon_with_holes_2 complicate_boundary(const Polygon_with_holes_2& polygon, FT min_gap = -1)
+		static std::vector<Halfedge_handle> get_adj_centerline_halfedge(
+			const std::unordered_set<Halfedge_handle>& centerline_hes,
+			const Vertex_handle& v
+		) {
+			std::vector<Halfedge_handle> adj_hes;
+			Halfedge_handle h = v->halfedge();
+			do {
+				Halfedge_handle adj_h = h->opposite();
+				if (h->is_bisector() && centerline_hes.find(adj_h) != centerline_hes.end())
+					adj_hes.push_back(adj_h);
+				h = h->next()->opposite();
+			} while (h != v->halfedge());
+			return std::move(adj_hes);
+		}
+		static std::unordered_set<Face_handle> get_adj_faces(const Face_handle& face) {
+			std::unordered_set<Face_handle> adj_faces;
+			Halfedge_handle h = face->halfedge();
+			do {
+				if (h->is_bisector())
+					adj_faces.insert(h->opposite()->face());
+				h = h->next();
+			} while (h != face->halfedge());
+			return std::move(adj_faces);
+			};
+		
+		static void assign_skeleton_segments(
+			const boost::shared_ptr<Ss>& skeleton, 
+			std::vector<Segment_2>& skeleton_segments
+		) {
+			for (Halfedge_iterator it = skeleton->halfedges_begin(); it != skeleton->halfedges_end(); ++it) {
+				Vertex_handle from = it->opposite()->vertex(), to = it->vertex();
+				skeleton_segments.push_back(Segment_2(from->point(), to->point()));
+			}
+		}
+		static void assign_skeleton_faces(
+			const boost::shared_ptr<Ss>& skeleton,
+			std::vector<Polygon_2>& skeleton_faces
+		) {
+			for (Face_iterator it = skeleton->faces_begin(); it != skeleton->faces_end(); ++it) {
+				Face_handle face = it;
+				skeleton_faces.push_back(get_Poly_from_Face(face));
+			}
+		}
+		static void assign_skeleton_centerlines(
+			const boost::shared_ptr<Ss>& skeleton,
+			const std::unordered_set<Halfedge_handle>& centerline_hes,
+			std::vector<Segment_2>& skeleton_centerlines,
+			std::vector<Segment_2>& skeleton_otherlines
+		) {
+			for (Halfedge_iterator it = skeleton->halfedges_begin(); it != skeleton->halfedges_end(); ++it) {
+				if (it->is_bisector()) {    // the halfedge is not border
+					Vertex_handle from = it->opposite()->vertex(), to = it->vertex();
+					if (from->id() < to->id())
+						if (centerline_hes.find(it) != centerline_hes.end())
+							skeleton_centerlines.push_back(Segment_2(from->point(), to->point()));
+						else
+							skeleton_otherlines.push_back(Segment_2(from->point(), to->point()));
+				}
+			}
+		}
+
+		Polygon_with_holes_2 simplify_boundary(
+			const Polygon_with_holes_2& polygon,
+			const std::string& simplify_order
+		) const {
+			SimplifyBoundary::SimplifyProps<InnerK> simpProps = SimplifyBoundary::SimplifyProps<InnerK>();
+			SimplifyBoundary::ExpandProps<InnerK> expandProps = SimplifyBoundary::ExpandProps<InnerK>();
+			expandProps.simplify_order = simplify_order;
+			SimplifyBoundary::Solver<InnerK> sbSolver(polygon, simpProps, expandProps);
+			return std::move(sbSolver.simplify_space);
+		}
+		Polygon_with_holes_2 complicate_boundary(
+			const Polygon_with_holes_2& polygon,
+			FT min_gap = -1
+		) const
 		{
 			if (min_gap == -1)
 			{
@@ -132,11 +208,8 @@ namespace Partition
 				{
 					FT length = CGAL::squared_distance(edge->source(), edge->target());
 					if (length < min_length)
-					{
 						min_length = length;
-					}
 				}
-
 				min_gap = CGAL::approximate_sqrt(min_length) * 50;
 			}
 
@@ -186,85 +259,24 @@ namespace Partition
 				holes.push_back(hole);
 			}
 
-			return Polygon_with_holes_2(outer_boundary, holes.begin(), holes.end());
+			return std::move(Polygon_with_holes_2(outer_boundary, holes.begin(), holes.end()));
 		}
-
-		KernelConverter::KernelConverter<K, InnerK, KernelConverter::NumberConverter<typename K::FT, FT>>K2InnerK;
-		KernelConverter::KernelConverter<InnerK, K, KernelConverter::NumberConverter<FT, typename K::FT>>InnerK2K;
-		CGAL::Polygon_with_holes_2<K> origin_space;
-		Polygon_with_holes_2 polygon;
-		boost::shared_ptr<Ss> skeleton;
-		std::vector<Segment_2> skeleton_segments;
-		std::vector<Segment_2> skeleton_centerlines;
-		std::vector<Segment_2> skeleton_otherlines;
-		std::vector<Polygon_2> skeleton_faces;
-		std::vector<std::vector<Polygon_2>> partition;
-		std::vector<Polygon_2> merge_partition;
-		std::vector<Polygon_2> uncertain_parts;
-		std::vector<Segment_2> split_segments;
-		std::vector<Point_2> log_points;
-	public:
-		Solver() {}
-		Solver(const CGAL::Polygon_with_holes_2<K>& space, const PartitionProps& props = PartitionProps());
-
-		CGAL::Polygon_with_holes_2<K> get_origin_space() const { return this->origin_space; }
-		CGAL::Polygon_with_holes_2<K> get_polygon() const { return this->InnerK2K.convert(this->polygon); }
-		std::vector<CGAL::Segment_2<K>> get_skeleton_segments() const { this->InnerK2K.convert(this->skeleton_segments); }
-		std::vector<CGAL::Segment_2<K>> get_skeleton_centerlines() const { return this->InnerK2K.convert(this->skeleton_centerlines); }
-		std::vector<CGAL::Segment_2<K>> get_skeleton_otherlines() const { return this->InnerK2K.convert(this->skeleton_otherlines); }
-		std::vector<CGAL::Polygon_2<K>> get_skeleton_faces() const { return this->InnerK2K.convert(this->skeleton_faces); }
-		std::vector<std::vector<CGAL::Polygon_2<K>>> get_partition() const {
-			std::vector<std::vector<CGAL::Polygon_2<K>>> res;
-			for (const auto& part : this->partition)
-				res.push_back(this->InnerK2K.convert(part));
-			return res;
-		}
-		std::vector<CGAL::Polygon_2<K>> get_uncertain_parts() const { return this->InnerK2K.convert(this->uncertain_parts); }
-		std::vector<CGAL::Segment_2<K>> get_split_segments() const { return this->InnerK2K.convert(this->split_segments); }
-		std::vector<CGAL::Point_2<K>> get_log_points() const { return this->InnerK2K.convert(this->log_points); }
-	};
-}
-
-namespace Partition
-{
-	template <typename K>
-	Solver<K>::Solver(const CGAL::Polygon_with_holes_2<K>& space, const PartitionProps& props)
-	{
-		this->origin_space = space;
-		if (props.withSimplifyBoundary) {
-			// 1. Simplify Boundary
-			SimplifyBoundary::SimplifyProps<InnerK> simpProps = SimplifyBoundary::SimplifyProps<InnerK>();
-			SimplifyBoundary::ExpandProps<InnerK> expandProps = SimplifyBoundary::ExpandProps<InnerK>();
-			expandProps.simplify_order = props.simplify_order;
-			SimplifyBoundary::Solver<InnerK> sbSolver(this->K2InnerK.convert(this->origin_space), simpProps, expandProps);
-			this->polygon = this->complicate_boundary(sbSolver.simplify_space, 5000);
-			//this->polygon = sbSolver2.simplify_space;
-
-			// 2. skeleton 
-			this->skeleton = build_skeleton(this->polygon);
-			for (Halfedge_iterator it = this->skeleton->halfedges_begin(); it != this->skeleton->halfedges_end(); ++it) {
-				Vertex_handle from = it->opposite()->vertex(), to = it->vertex();
-				skeleton_segments.push_back(Segment_2(from->point(), to->point()));
-			}
-			Decorator decorator(*this->skeleton);
-
-			std::cout << "partition..." << std::endl;
-			// 3. find centerline
-			// 3.1 save to skeleton_faces
-			for (Face_iterator it = this->skeleton->faces_begin(); it != this->skeleton->faces_end(); ++it) {
-				Face_handle face = it;
-				skeleton_faces.push_back(get_Poly_from_Face(face));
-			}
-			// 3.2 find center line
-			// first we try to make skeleton of no connect boundary is center line
+		void find_centerline(
+			const boost::shared_ptr<Ss>& skeleton,
+			std::unordered_set<Halfedge_handle>& centerline_hes,
+			std::unordered_set<Vertex_handle>& connected_vertices,
+			std::unordered_set<Vertex_handle>& leaf_vertices
+		) {
+			centerline_hes.clear();
+			connected_vertices.clear();
+			leaf_vertices.clear();
 			std::unordered_map<Vertex_handle, int> centerline_vertex2cnt;
 			std::unordered_set<Vertex_handle> stop_vertices;
-			std::unordered_set<Halfedge_handle> centerline_hes;
 			std::vector<std::pair<Vertex_handle, bool>> he_pool;   // from_vertex 2 is_ans ; use a vector to control the loop sequence so that there is always same result
 			double THRE_THETA = 150;
 			FT MIN_SQUARED_COS_THETA = std::cos(THRE_THETA * M_PI / 180);
 			MIN_SQUARED_COS_THETA *= MIN_SQUARED_COS_THETA;
-			for (Halfedge_iterator it = this->skeleton->halfedges_begin(); it != this->skeleton->halfedges_end(); ++it) {
+			for (Halfedge_iterator it = skeleton->halfedges_begin(); it != skeleton->halfedges_end(); ++it) {
 				if (it->is_bisector()) {    // the halfedge is not border
 					Vertex_handle from = it->opposite()->vertex(), to = it->vertex();
 					Halfedge_handle l = it->defining_contour_edge(), r = it->opposite()->defining_contour_edge();   // get the two contour edges of the skeleton edge
@@ -323,20 +335,6 @@ namespace Partition
 				} while (h != v->halfedge());
 				return adj_vertex;
 				};
-			auto get_adj_centerline_halfedge = [&](Vertex_handle v) {
-				std::vector<Halfedge_handle> adj_hes;
-				Halfedge_handle h = v->halfedge();
-				do {
-					Halfedge_handle adj_h = h->opposite();
-					if (h->is_bisector() && centerline_vertex2cnt.find(adj_h->vertex()) != centerline_vertex2cnt.end())
-						adj_hes.push_back(adj_h);
-					h = h->next()->opposite();
-				} while (h != v->halfedge());
-				return adj_hes;
-				};
-			auto get_ans_num = [&](Vertex_handle v) {
-				return get_adj_centerline_vertex(v).size();
-				};
 			auto get_next_ans_vertex = [&](Vertex_handle v, bool& delete_v) {
 				std::vector<Vertex_handle>& adj_vertices = get_adj_centerline_vertex(v);
 				if (adj_vertices.size() != 1) {
@@ -345,12 +343,11 @@ namespace Partition
 				}
 				return adj_vertices[0];
 				};
-			std::unordered_set<Vertex_handle> leaf_vertex;
 			for (std::pair<Vertex_handle, bool>& it : he_pool)
 				if (it.second == true)   // is centerline candidate
 					if (centerline_vertex2cnt[it.first] == 1)
-						leaf_vertex.insert(it.first);
-			for (Vertex_handle lv : leaf_vertex) {
+						leaf_vertices.insert(it.first);
+			for (Vertex_handle lv : leaf_vertices) {
 				Vertex_handle& cur_v = lv;
 				log_points.push_back(cur_v->point());
 				bool delete_v = true;
@@ -362,40 +359,37 @@ namespace Partition
 					cur_v = next_v;
 				} while (stop_vertices.find(cur_v) == stop_vertices.end());
 			}
-			std::unordered_set<Vertex_handle> connected_vertex;
 			for (auto& it : centerline_vertex2cnt)
 				it.second = get_adj_centerline_vertex(it.first).size();
-			leaf_vertex.clear();
+			leaf_vertices.clear();
 			for (auto& it : centerline_vertex2cnt)
 				if (it.second == 1)
-					leaf_vertex.insert(it.first);
+					leaf_vertices.insert(it.first);
 				else if (it.second == 3)
-					connected_vertex.insert(it.first);
-			for (Halfedge_iterator it = this->skeleton->halfedges_begin(); it != this->skeleton->halfedges_end(); ++it) {
+					connected_vertices.insert(it.first);
+			for (Halfedge_iterator it = skeleton->halfedges_begin(); it != skeleton->halfedges_end(); ++it) {
 				if (it->is_bisector()) {    // the halfedge is not border
 					Vertex_handle from = it->opposite()->vertex(), to = it->vertex();
 					if (from->id() < to->id()) {
-						if (from->time() > to->time())
-							swap(from, to);
 						if (centerline_vertex2cnt.find(from) != centerline_vertex2cnt.end() && centerline_vertex2cnt.find(to) != centerline_vertex2cnt.end()) {   // centerline
-							this->skeleton_centerlines.push_back(Segment_2(from->point(), to->point()));
 							centerline_hes.insert(it);
 							centerline_hes.insert(it->opposite());
 						}
-						else
-							this->skeleton_otherlines.push_back(Segment_2(from->point(), to->point()));
 					}
 				}
 			}
-
-			// 4. partition
-			// 4.1 init partition according to connected vertex
-			std::vector<std::unordered_set<Face_handle>> Face_partition;
-			std::vector<std::unordered_set<Vertex_handle>> parts;
-			std::unordered_set<Halfedge_handle> special_hes;
+		}
+		void init_parition(
+			const std::unordered_set<Vertex_handle>& connected_vertices,
+			const std::unordered_set<Halfedge_handle>& centerline_hes,
+			std::vector<std::unordered_set<Vertex_handle>>& parts,
+			std::unordered_set<Halfedge_handle>& special_hes
+		) {
+			parts.clear();
+			special_hes.clear();
 			std::unordered_set<Halfedge_handle> visited;
-			for (Vertex_handle it : connected_vertex) {
-				std::vector<Halfedge_handle>& adj_hes = get_adj_centerline_halfedge(it);
+			for (Vertex_handle it : connected_vertices) {
+				std::vector<Halfedge_handle>& adj_hes = get_adj_centerline_halfedge(centerline_hes, it);
 				for (auto he : adj_hes) {
 					if (visited.find(he) != visited.end())
 						continue;
@@ -406,7 +400,7 @@ namespace Partition
 					visited.insert(he->opposite());
 					part.insert(it);
 					part.insert(v);
-					auto adj_next_hes = get_adj_centerline_halfedge(v);
+					auto adj_next_hes = get_adj_centerline_halfedge(centerline_hes, v);
 					while (adj_next_hes.size() == 2) {
 						Halfedge_handle next_hes = (part.find(adj_next_hes[0]->vertex()) == part.end()) ? adj_next_hes[0] : adj_next_hes[1];
 						if (visited.find(next_hes) != visited.end())
@@ -415,43 +409,21 @@ namespace Partition
 						visited.insert(next_hes->opposite());
 						Vertex_handle next_v = next_hes->vertex();
 						part.insert(next_v);
-						adj_next_hes = get_adj_centerline_halfedge(next_v);
+						adj_next_hes = get_adj_centerline_halfedge(centerline_hes, next_v);
 					}
-					if (part.size() == 2 && connected_vertex.find(v) != connected_vertex.end()) {
+					if (part.size() == 2 && connected_vertices.find(v) != connected_vertices.end()) {
 						special_hes.insert(he);
 						special_hes.insert(he->opposite());
 					}
 					parts.push_back(part);
 				}
 			}
-			std::cout << "partition num : " << parts.size() << ", parition edges num : ";
-			int total_partition_edges_num = 0;
-			for (auto p : parts) {
-				std::cout << p.size() << " ";
-				total_partition_edges_num += p.size();
-			}
-			std::cout << ", sum up: " << total_partition_edges_num << std::endl;
-			std::unordered_map < Vertex_handle, std::unordered_set<int>> v2pn;  // vertex 2 part num
-			for (int part_num = 0; part_num < parts.size(); ++part_num)
-				for (auto v : parts[part_num])
-					v2pn[v].insert(part_num);
-			Face_partition = std::vector<std::unordered_set<Face_handle>>(parts.size());
-
-			// 4.2 find certain faces and uncertain faces
-			auto get_adj_faces = [&](const Face_handle& face) {
-				std::unordered_set<Face_handle> adj_faces;
-				Halfedge_handle h = face->halfedge();
-				do {
-					if (h->is_bisector())
-						adj_faces.insert(h->opposite()->face());
-					h = h->next();
-				} while (h != face->halfedge());
-				return adj_faces;
-				};
-			std::vector<std::unordered_set<Face_handle>> certain_faces(parts.size());     // faces which are certain belong to which part
-			std::unordered_set<Face_handle> uncertain_faces;                       // faces which are uncertain belong to which part   
-			std::unordered_map<Face_handle, int> face2pn;                   // face 2 part num
-			std::unordered_map<Halfedge_handle, int> he2pn;
+		}
+		void define_he2pn(
+			const std::vector<std::unordered_set<Vertex_handle>>& parts,
+			std::unordered_map<Halfedge_handle, int>& he2pn
+		) {
+			he2pn.clear();
 			for (int i = 0; i < parts.size(); i++) {
 				const int& part_num = i;
 				const std::unordered_set<Vertex_handle>& part = parts[i];
@@ -467,6 +439,18 @@ namespace Partition
 					} while (h != v->halfedge());
 				}
 			}
+		}
+		void define_face_partnum(
+			const std::unordered_map<Halfedge_handle, int>& he2pn,
+			const std::unordered_set<Vertex_handle>& connected_vertices,
+			const std::unordered_set<Vertex_handle>& leaf_vertices,
+			const int& total_partnum,
+			std::vector<std::unordered_set<Face_handle>>& Face_partition,
+			std::unordered_set<Face_handle>& uncertain_faces
+		) {
+			Face_partition = std::vector<std::unordered_set<Face_handle>>(total_partnum);
+			uncertain_faces.clear();
+			std::unordered_map<Face_handle, int> face2pn;                   // face 2 part num
 			for (auto it : he2pn) {
 				Halfedge_handle he = it.first;
 				int part_num = it.second;
@@ -477,12 +461,12 @@ namespace Partition
 				if (face2pn.find(f) != face2pn.end())
 					continue;
 
-				// the face is uncertain if there is a connected_vertex in there
+				// the face is uncertain if there is a connected_vertices in there
 				bool is_uncertain = false;
 				Halfedge_handle h = f->halfedge();
 				do {
 					Vertex_handle v = h->vertex();
-					if (connected_vertex.find(v) != connected_vertex.end()) {
+					if (connected_vertices.find(v) != connected_vertices.end()) {
 						is_uncertain = true;
 						break;
 					}
@@ -496,7 +480,7 @@ namespace Partition
 				}
 
 				// the face is certain if there is a leaf vertex
-				if (leaf_vertex.find(he->vertex()) != leaf_vertex.end()) {
+				if (leaf_vertices.find(he->vertex()) != leaf_vertices.end()) {
 					Face_handle f = he->next()->opposite()->face();
 					q.push(f);
 					q_set.insert(f);
@@ -506,17 +490,15 @@ namespace Partition
 					Face_handle cur_face = q.front();
 					q.pop();
 					q_set.erase(cur_face);
-					certain_faces[part_num].insert(cur_face);
 					face2pn[cur_face] = part_num;
 					Face_partition[part_num].insert(cur_face);
 					std::unordered_set<Face_handle>& adj_faces = get_adj_faces(cur_face);
-					//std::cout << "adj_faces.size() = " << adj_faces.size() << std::endl;
 					for (auto& adj_face : adj_faces) {
 						bool is_same_part = true;
 						Halfedge_handle h = adj_face->halfedge();
 						do {
 							Vertex_handle v = h->vertex();
-							if (connected_vertex.find(v) != connected_vertex.end()) {
+							if (connected_vertices.find(v) != connected_vertices.end()) {
 								is_same_part = false;
 								break;
 							}
@@ -529,8 +511,11 @@ namespace Partition
 					}
 				}
 			}
-
-			// 4.3 get halfedge 2 part num
+		}
+		void refine_he2pn(
+			const std::vector<std::unordered_set<Face_handle>>& Face_partition,
+			std::unordered_map<Halfedge_handle, int>& he2pn
+		) {
 			for (int part_num = 0; part_num < Face_partition.size(); part_num++)
 				for (const Face_handle& face : Face_partition[part_num]) {
 					Halfedge_handle cur_h = face->halfedge();
@@ -539,8 +524,14 @@ namespace Partition
 						cur_h = cur_h->next();
 					} while (cur_h != face->halfedge());
 				}
-
-			// spilit uncertain faces
+		}
+		void split_uncertain_faces(
+			Decorator& decorator,
+			std::unordered_set<Face_handle>& uncertain_faces,
+			const std::unordered_set<Vertex_handle>& connected_vertices,
+			std::unordered_map<Halfedge_handle, int>& he2pn,
+			std::vector<std::unordered_set<Face_handle>>& Face_partition
+		){
 			auto areTwoIntersectionPointsInside = [](const Polygon_2& polygon, const Segment_2& segment) {
 				std::vector<Point_2> intersection_points;
 				Point_2 mid_point = segment.source() + (segment.target() - segment.source()) / 2;
@@ -604,7 +595,7 @@ namespace Partition
 					/*if (he2pn.find(h) != he2pn.end())
 						split_hes_pns.insert(he2pn[h]);*/
 					Vertex_handle v = h->vertex();
-					if (connected_vertex.find(v) != connected_vertex.end()) {
+					if (connected_vertices.find(v) != connected_vertices.end()) {
 						split_hes[h] = VAttr();
 						split_hes_pns.insert(he2pn[h]);
 						split_hes_pns.insert(he2pn[h->next()]);
@@ -806,9 +797,15 @@ namespace Partition
 			for (Face_handle face : temp_convert_faces)
 				uncertain_faces.erase(face);
 			temp_convert_faces.clear();
-			//std::cout << "special_hes.size() = " << special_hes.size() << std::endl;
+		}
+		void erase_special_uncertain_faces(
+			const std::unordered_set<Halfedge_handle>& special_hes,
+			std::unordered_map<Halfedge_handle, int>& he2pn,
+			std::unordered_set<Face_handle>& uncertain_faces,
+			std::vector<std::unordered_set<Face_handle>>& Face_partition
+		) {
 			for (Halfedge_handle he : special_hes) {
-				int part_num = he2pn[he];
+				const int& part_num = he2pn[he];
 				Face_handle face = he->face();
 				Face_partition[part_num].insert(face);
 				Halfedge_handle cur_h = face->halfedge();
@@ -819,6 +816,96 @@ namespace Partition
 				if (uncertain_faces.find(face) != uncertain_faces.end())
 					uncertain_faces.erase(face);
 			}
+		}
+
+		KernelConverter::KernelConverter<K, InnerK, KernelConverter::NumberConverter<typename K::FT, FT>>K2InnerK;
+		KernelConverter::KernelConverter<InnerK, K, KernelConverter::NumberConverter<FT, typename K::FT>>InnerK2K;
+		CGAL::Polygon_with_holes_2<K> origin_space;
+		Polygon_with_holes_2 polygon;
+		boost::shared_ptr<Ss> skeleton;
+		std::vector<Segment_2> skeleton_segments;
+		std::vector<Segment_2> skeleton_centerlines;
+		std::vector<Segment_2> skeleton_otherlines;
+		std::vector<Polygon_2> skeleton_faces;
+		std::vector<std::vector<Polygon_2>> partition;
+		std::vector<Polygon_2> merge_partition;
+		std::vector<Polygon_2> uncertain_parts;
+		std::vector<Segment_2> split_segments;
+		std::vector<Point_2> log_points;
+	public:
+		Solver() {}
+		Solver(const CGAL::Polygon_with_holes_2<K>& space, const PartitionProps& props = PartitionProps());
+
+		CGAL::Polygon_with_holes_2<K> get_origin_space() const { return this->origin_space; }
+		CGAL::Polygon_with_holes_2<K> get_polygon() const { return this->InnerK2K.convert(this->polygon); }
+		std::vector<CGAL::Segment_2<K>> get_skeleton_segments() const { this->InnerK2K.convert(this->skeleton_segments); }
+		std::vector<CGAL::Segment_2<K>> get_skeleton_centerlines() const { return this->InnerK2K.convert(this->skeleton_centerlines); }
+		std::vector<CGAL::Segment_2<K>> get_skeleton_otherlines() const { return this->InnerK2K.convert(this->skeleton_otherlines); }
+		std::vector<CGAL::Polygon_2<K>> get_skeleton_faces() const { return this->InnerK2K.convert(this->skeleton_faces); }
+		std::vector<std::vector<CGAL::Polygon_2<K>>> get_partition() const {
+			std::vector<std::vector<CGAL::Polygon_2<K>>> res;
+			for (const auto& part : this->partition)
+				res.push_back(this->InnerK2K.convert(part));
+			return res;
+		}
+		std::vector<CGAL::Polygon_2<K>> get_uncertain_parts() const { return this->InnerK2K.convert(this->uncertain_parts); }
+		std::vector<CGAL::Segment_2<K>> get_split_segments() const { return this->InnerK2K.convert(this->split_segments); }
+		std::vector<CGAL::Point_2<K>> get_log_points() const { return this->InnerK2K.convert(this->log_points); }
+	};
+}
+
+namespace Partition
+{
+	template <typename K>
+	Solver<K>::Solver(const CGAL::Polygon_with_holes_2<K>& space, const PartitionProps& props)
+	{
+		this->origin_space = space;
+		if (props.withSimplifyBoundary) {
+			std::cout << "STEP 1: Simplify Boundary" << std::endl;
+			Polygon_with_holes_2 InnerK_space = this->K2InnerK.convert(this->origin_space);
+			Polygon_with_holes_2 simplify_space = simplify_boundary(InnerK_space, props.simplify_order);
+			this->polygon = this->complicate_boundary(simplify_space, 5000);
+			//this->polygon = simplify_space;
+
+			std::cout << "STEP 2: Build Skeleton" << std::endl;
+			this->skeleton = build_skeleton(this->polygon);
+			Decorator decorator(*this->skeleton);
+			assign_skeleton_segments(this->skeleton, this->skeleton_segments);
+			assign_skeleton_faces(this->skeleton, this->skeleton_faces);
+
+			std::unordered_set<Halfedge_handle> centerline_hes;
+			std::unordered_set<Vertex_handle> connected_vertices;
+			std::unordered_set<Vertex_handle> leaf_vertices;
+			find_centerline(this->skeleton, centerline_hes, connected_vertices, leaf_vertices);
+			assign_skeleton_centerlines(this->skeleton, centerline_hes, this->skeleton_centerlines, this->skeleton_otherlines);
+
+			// 4. partition
+			// 4.1 init partition according to connected vertex
+			std::vector<std::unordered_set<Vertex_handle>> parts;
+			std::unordered_set<Halfedge_handle> special_hes;
+			init_parition(connected_vertices, centerline_hes, parts, special_hes);
+			std::cout << "partition num : " << parts.size() << ", parition edges num : ";
+			int total_partition_edges_num = 0;
+			for (auto p : parts) {
+				std::cout << p.size() << " ";
+				total_partition_edges_num += p.size();
+			}
+			std::cout << ", sum up: " << total_partition_edges_num << std::endl;
+
+			std::unordered_map<Halfedge_handle, int> he2pn;
+			define_he2pn(parts, he2pn);
+			
+			// 4.2 find certain faces and uncertain faces
+			int total_partnum = parts.size();
+			std::unordered_set<Face_handle> uncertain_faces;                       // faces which are uncertain belong to which part   
+			std::vector<std::unordered_set<Face_handle>> Face_partition;
+			define_face_partnum(he2pn, connected_vertices, leaf_vertices, total_partnum, Face_partition, uncertain_faces);
+			refine_he2pn(Face_partition, he2pn);
+
+			// spilit uncertain faces
+			split_uncertain_faces(decorator, uncertain_faces, connected_vertices, he2pn, Face_partition);
+			erase_special_uncertain_faces(special_hes, he2pn, uncertain_faces, Face_partition);
+			
 			this->partition = std::vector<std::vector<Polygon_2>>(Face_partition.size());
 			for (int part_num = 0; part_num < Face_partition.size(); part_num++)
 				for (const Face_handle& face : Face_partition[part_num])
