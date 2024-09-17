@@ -138,6 +138,16 @@ namespace Partition
 			} while (h != v->halfedge());
 			return std::move(adj_hes);
 		}
+		static std::unordered_set<Face_handle> get_adj_faces(const Face_handle& face) {
+			std::unordered_set<Face_handle> adj_faces;
+			Halfedge_handle h = face->halfedge();
+			do {
+				if (h->is_bisector())
+					adj_faces.insert(h->opposite()->face());
+				h = h->next();
+			} while (h != face->halfedge());
+			return std::move(adj_faces);
+			};
 		
 		static void assign_skeleton_segments(
 			const boost::shared_ptr<Ss>& skeleton, 
@@ -409,6 +419,32 @@ namespace Partition
 				}
 			}
 		}
+		void define_part_num(
+			const std::vector<std::unordered_set<Vertex_handle>>& parts,
+			std::unordered_map < Vertex_handle, std::unordered_set<int>>& v2pn,
+			std::unordered_map<Halfedge_handle, int>& he2pn
+		) {
+			v2pn.clear();
+			he2pn.clear();
+			for (int part_num = 0; part_num < parts.size(); ++part_num)
+				for (auto v : parts[part_num])
+					v2pn[v].insert(part_num);
+			for (int i = 0; i < parts.size(); i++) {
+				const int& part_num = i;
+				const std::unordered_set<Vertex_handle>& part = parts[i];
+				for (auto& v : part) {
+					Halfedge_handle h = v->halfedge();
+					do {
+						Vertex_handle from = h->opposite()->vertex(), to = h->vertex();
+						if (part.find(from) != part.end() && part.find(to) != part.end() && he2pn.find(h) == he2pn.end()) {
+							he2pn[h] = part_num;
+							he2pn[h->opposite()] = part_num;
+						}
+						h = h->next()->opposite();
+					} while (h != v->halfedge());
+				}
+			}
+		}
 
 		KernelConverter::KernelConverter<K, InnerK, KernelConverter::NumberConverter<typename K::FT, FT>>K2InnerK;
 		KernelConverter::KernelConverter<InnerK, K, KernelConverter::NumberConverter<FT, typename K::FT>>InnerK2K;
@@ -476,51 +512,23 @@ namespace Partition
 			std::vector<std::unordered_set<Vertex_handle>> parts;
 			std::unordered_set<Halfedge_handle> special_hes;
 			init_parition(connected_vertices, centerline_hes, parts, special_hes);
-			
 			std::cout << "partition num : " << parts.size() << ", parition edges num : ";
-			std::vector<std::unordered_set<Face_handle>> Face_partition;
 			int total_partition_edges_num = 0;
 			for (auto p : parts) {
 				std::cout << p.size() << " ";
 				total_partition_edges_num += p.size();
 			}
 			std::cout << ", sum up: " << total_partition_edges_num << std::endl;
-			std::unordered_map < Vertex_handle, std::unordered_set<int>> v2pn;  // vertex 2 part num
-			for (int part_num = 0; part_num < parts.size(); ++part_num)
-				for (auto v : parts[part_num])
-					v2pn[v].insert(part_num);
-			Face_partition = std::vector<std::unordered_set<Face_handle>>(parts.size());
 
+			std::unordered_map < Vertex_handle, std::unordered_set<int>> v2pn;
+			std::unordered_map<Halfedge_handle, int> he2pn;
+			define_part_num(parts, v2pn, he2pn);
+			
 			// 4.2 find certain faces and uncertain faces
-			auto get_adj_faces = [&](const Face_handle& face) {
-				std::unordered_set<Face_handle> adj_faces;
-				Halfedge_handle h = face->halfedge();
-				do {
-					if (h->is_bisector())
-						adj_faces.insert(h->opposite()->face());
-					h = h->next();
-				} while (h != face->halfedge());
-				return adj_faces;
-				};
 			std::vector<std::unordered_set<Face_handle>> certain_faces(parts.size());     // faces which are certain belong to which part
 			std::unordered_set<Face_handle> uncertain_faces;                       // faces which are uncertain belong to which part   
 			std::unordered_map<Face_handle, int> face2pn;                   // face 2 part num
-			std::unordered_map<Halfedge_handle, int> he2pn;
-			for (int i = 0; i < parts.size(); i++) {
-				const int& part_num = i;
-				const std::unordered_set<Vertex_handle>& part = parts[i];
-				for (auto& v : part) {
-					Halfedge_handle h = v->halfedge();
-					do {
-						Vertex_handle from = h->opposite()->vertex(), to = h->vertex();
-						if (part.find(from) != part.end() && part.find(to) != part.end() && he2pn.find(h) == he2pn.end()) {
-							he2pn[h] = part_num;
-							he2pn[h->opposite()] = part_num;
-						}
-						h = h->next()->opposite();
-					} while (h != v->halfedge());
-				}
-			}
+			std::vector<std::unordered_set<Face_handle>> Face_partition(parts.size());
 			for (auto it : he2pn) {
 				Halfedge_handle he = it.first;
 				int part_num = it.second;
