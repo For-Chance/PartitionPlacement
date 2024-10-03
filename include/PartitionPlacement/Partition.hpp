@@ -147,10 +147,10 @@ namespace Partition
 				h = h->next();
 			} while (h != face->halfedge());
 			return std::move(adj_faces);
-			};
-		
+		};
+
 		static void assign_skeleton_segments(
-			const boost::shared_ptr<Ss>& skeleton, 
+			const boost::shared_ptr<Ss>& skeleton,
 			std::vector<Segment_2>& skeleton_segments
 		) {
 			for (Halfedge_iterator it = skeleton->halfedges_begin(); it != skeleton->halfedges_end(); ++it) {
@@ -531,7 +531,7 @@ namespace Partition
 			const std::unordered_set<Vertex_handle>& connected_vertices,
 			std::unordered_map<Halfedge_handle, int>& he2pn,
 			std::vector<std::unordered_set<Face_handle>>& Face_partition
-		){
+		) {
 			auto areTwoIntersectionPointsInside = [](const Polygon_2& polygon, const Segment_2& segment) {
 				std::vector<Point_2> intersection_points;
 				Point_2 mid_point = segment.source() + (segment.target() - segment.source()) / 2;
@@ -894,7 +894,7 @@ namespace Partition
 
 			std::unordered_map<Halfedge_handle, int> he2pn;
 			define_he2pn(parts, he2pn);
-			
+
 			// 4.2 find certain faces and uncertain faces
 			int total_partnum = parts.size();
 			std::unordered_set<Face_handle> uncertain_faces;                       // faces which are uncertain belong to which part   
@@ -905,7 +905,7 @@ namespace Partition
 			// spilit uncertain faces
 			split_uncertain_faces(decorator, uncertain_faces, connected_vertices, he2pn, Face_partition);
 			erase_special_uncertain_faces(special_hes, he2pn, uncertain_faces, Face_partition);
-			
+
 			this->partition = std::vector<std::vector<Polygon_2>>(Face_partition.size());
 			for (int part_num = 0; part_num < Face_partition.size(); part_num++)
 				for (const Face_handle& face : Face_partition[part_num])
@@ -1019,13 +1019,23 @@ namespace Partition
 			for (std::unordered_set<int> parts : nonstandard_parts_set) {
 				// find the suitable parts (drop the part whose have leaf vertex)
 
-
 				int the_first_part_num = *parts.begin();
+				Part& main_part = pn2nonstandard_part[the_first_part_num];
+
 				std::vector<Polygon_2> polygons;
 				for (int part_num : parts) {
 					polygons.insert(polygons.end(), this->partition[part_num].begin(), this->partition[part_num].end());
+
+					// refine，将other_part中的属性合并到main_part中，并且维护Face_partition
+					Part& other_part = pn2nonstandard_part[part_num];
+					main_part.centerline_hes.insert(other_part.centerline_hes.begin(), other_part.centerline_hes.end());
+					main_part.border_hes.insert(other_part.border_hes.begin(), other_part.border_hes.end());
+
+					// delete the part, some part will be size() = 0, 
 					this->partition[part_num].clear();
 				}
+
+				main_part.adjacent_nonstandard_part.clear();
 				this->partition[the_first_part_num] = polygons;
 			}
 		}
